@@ -17,8 +17,26 @@ export type Grade = {
   vocab: { term: string; english: string; note?: string }[];
   reference: string;
   note: string;
+  /** The answer as it was split for grading, so the UI tints exactly what was judged. */
+  answerSentences?: string[];
+  sentences?: SentenceVerdict[];
   /** Language errors, when you are the one writing the foreign language. */
   corrections?: { yours: string; better: string; why: string }[];
+};
+
+export type SentenceIssue = {
+  kind: string;
+  /** The exact fragment at fault, quoted from the learner. */
+  text: string;
+  why: string;
+};
+
+/** A verdict on one sentence of the learner answer, keyed by its position. */
+export type SentenceVerdict = {
+  index: number;
+  score: number;
+  issues: SentenceIssue[];
+  note?: string;
 };
 
 export type Hint = { level: number; text: string };

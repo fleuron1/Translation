@@ -1,7 +1,23 @@
 import { NextResponse } from "next/server";
 import { askJson, errorResponse } from "@/lib/gemini";
+import { splitSentences } from "@/lib/segment";
 import { langName } from "@/lib/types";
-import type { Direction, Grade } from "@/lib/types";
+import type { Direction, Grade, SentenceVerdict } from "@/lib/types";
+
+/**
+ * The server splits the answer and hands the model NUMBERED sentences, then
+ * takes back judgements keyed by those numbers. Quoting text back would mean
+ * fuzzy-matching the model's version of the answer against the real one; an
+ * index cannot drift, and the exact segments go back to the UI so what gets
+ * tinted is precisely what was judged.
+ */
+function sentencesOf(answer: string): string[] {
+  return answer
+    .split("\n")
+    .flatMap((line) => splitSentences(line.trim()))
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -64,6 +80,42 @@ function schemaFor(direction: Direction) {
     },
     reference: { type: "STRING", description: "A faithful, natural translation of the passage." },
     note: { type: "STRING", description: "One honest sentence to the learner." },
+    sentences: {
+      type: "ARRAY",
+      description:
+        "One verdict for each NUMBERED sentence of the learner's answer. Use the numbers given, cover every one of them, and never invent a sentence that was not listed.",
+      items: {
+        type: "OBJECT",
+        properties: {
+          index: { type: "INTEGER", description: "The number this sentence was given." },
+          score: { type: "INTEGER", description: "0-100 for this sentence alone." },
+          issues: {
+            type: "ARRAY",
+            description: "What is wrong with this sentence. Empty when it is fine.",
+            items: {
+              type: "OBJECT",
+              properties: {
+                kind: {
+                  type: "STRING",
+                  enum: ["missed", "misread", "added", "grammar", "word-choice", "awkward"],
+                },
+                text: {
+                  type: "STRING",
+                  description: "The exact fragment at fault, quoted from the learner.",
+                },
+                why: { type: "STRING", description: "One short clause." },
+              },
+              required: ["kind", "text", "why"],
+            },
+          },
+          note: {
+            type: "STRING",
+            description: "At most one short clause on the sentence overall. Omit if nothing to add.",
+          },
+        },
+        required: ["index", "score", "issues"],
+      },
+    },
   };
 
   const required = [
@@ -76,6 +128,7 @@ function schemaFor(direction: Direction) {
     "vocab",
     "reference",
     "note",
+    "sentences",
   ];
 
   if (direction === "into-target") {
@@ -198,6 +251,17 @@ export async function POST(request: Request) {
         ? `THE LEARNER'S ${language.toUpperCase()}:\n"""\n${userText}\n"""`
         : `WHAT THE LEARNER UNDERSTOOD, IN ENGLISH:\n"""\n${userText}\n"""`,
     );
+    const answerSentences = sentencesOf(userText);
+    parts.push(
+      `THE SAME ANSWER, SPLIT INTO NUMBERED SENTENCES. Judge each one on its own and return a verdict for every number, using these numbers exactly:\n` +
+        answerSentences.map((sentence, i) => `[${i}] ${sentence}`).join("\n"),
+    );
+    parts.push(
+      producing
+        ? `A sentence's score is how much of its share of the meaning survived AND how correct its ${language} is. Quote the exact fragment at fault in each issue.`
+        : `A sentence's score is how much of its share of the passage it got right. Quote the exact fragment at fault in each issue.`,
+    );
+
     if (body.hintsUsed) {
       parts.push(`The learner used ${body.hintsUsed} hint(s). Mention it only if it matters.`);
     }
@@ -216,6 +280,27 @@ export async function POST(request: Request) {
     grade.wrong ??= [];
     grade.vocab ??= [];
     if (producing) grade.corrections ??= [];
+
+    // Nothing from the model is trusted to index into the learner's text. An
+    // index that does not exist, or a second verdict for one already judged,
+    // would otherwise tint the wrong sentence or throw.
+    const seen = new Set<number>();
+    const verdicts: SentenceVerdict[] = [];
+    for (const verdict of grade.sentences ?? []) {
+      const index = Number(verdict?.index);
+      if (!Number.isInteger(index) || index < 0 || index >= answerSentences.length) continue;
+      if (seen.has(index)) continue;
+      seen.add(index);
+      verdicts.push({
+        index,
+        score: Math.max(0, Math.min(100, Math.round(Number(verdict.score) || 0))),
+        issues: Array.isArray(verdict.issues) ? verdict.issues : [],
+        note: verdict.note,
+      });
+    }
+
+    grade.answerSentences = answerSentences;
+    grade.sentences = verdicts.sort((a, b) => a.index - b.index);
 
     return NextResponse.json(grade);
   } catch (error) {

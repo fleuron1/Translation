@@ -42,6 +42,117 @@ function ScoreRing({ score, verdict }: { score: number; verdict: Grade["verdict"
   );
 }
 
+const BANDS = [
+  { from: 85, label: "solid", tint: "bg-good/15", edge: "border-good", text: "text-good" },
+  { from: 60, label: "shaky", tint: "bg-warn/15", edge: "border-warn", text: "text-warn" },
+  { from: 0, label: "wrong", tint: "bg-bad/15", edge: "border-bad", text: "text-bad" },
+];
+
+const bandFor = (score: number) => BANDS.find((band) => score >= band.from) ?? BANDS[2];
+
+/**
+ * The answer, sentence by sentence.
+ *
+ * Hovering is an enhancement, not the mechanism: a phone has no hover, so a
+ * tap pins a sentence open and it stays open until dismissed. Colour is never
+ * the only signal either — each sentence carries its score and a word for its
+ * band, and detail opens inline below rather than in a popover that has to be
+ * caught before it disappears.
+ */
+function SentenceMap({ grade }: { grade: Grade }) {
+  const [pinned, setPinned] = useState<number | null>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  const sentences = grade.answerSentences ?? [];
+  const verdicts = new Map((grade.sentences ?? []).map((v) => [v.index, v]));
+  if (sentences.length === 0 || verdicts.size === 0) return null;
+
+  const active = pinned ?? hovered;
+  const shown = active === null ? null : verdicts.get(active);
+
+  return (
+    <section>
+      <h3 className="text-xs font-semibold tracking-wide text-faint uppercase">
+        Your answer, sentence by sentence
+      </h3>
+      <p className="mt-1 mb-2 text-xs text-faint">
+        Tap a sentence to keep its notes open.
+      </p>
+
+      <p className="leading-loose">
+        {sentences.map((sentence, index) => {
+          const verdict = verdicts.get(index);
+          if (!verdict) {
+            return (
+              <span key={index} className="text-muted">
+                {sentence}{" "}
+              </span>
+            );
+          }
+          const band = bandFor(verdict.score);
+          const isActive = active === index;
+          return (
+            <button
+              key={index}
+              type="button"
+              aria-expanded={isActive}
+              aria-label={`Sentence ${index + 1}, ${verdict.score} out of 100, ${band.label}`}
+              onMouseEnter={() => setHovered(index)}
+              onMouseLeave={() => setHovered((current) => (current === index ? null : current))}
+              onFocus={() => setHovered(index)}
+              onBlur={() => setHovered((current) => (current === index ? null : current))}
+              onClick={() => setPinned((current) => (current === index ? null : index))}
+              className={`${band.tint} ${band.edge} mr-1 cursor-pointer rounded border-b-2 px-1 text-left transition ${
+                isActive ? "ring-2 ring-accent" : ""
+              }`}
+            >
+              <span className="reading text-base">{sentence}</span>
+              <span className={`ml-1 align-super text-[10px] font-semibold ${band.text}`}>
+                {verdict.score}
+              </span>
+            </button>
+          );
+        })}
+      </p>
+
+      {shown && (
+        <div className="rise mt-3 rounded-lg border border-rule bg-paper p-3">
+          <p className="flex items-baseline gap-2 text-xs">
+            <span className={`font-semibold ${bandFor(shown.score).text}`}>
+              {shown.score} · {bandFor(shown.score).label}
+            </span>
+            {pinned !== null && (
+              <button
+                type="button"
+                onClick={() => setPinned(null)}
+                className="ml-auto text-faint hover:text-ink"
+              >
+                close
+              </button>
+            )}
+          </p>
+          {shown.note && <p className="mt-1 text-sm text-ink">{shown.note}</p>}
+          {shown.issues.length > 0 ? (
+            <ul className="mt-2 space-y-1.5">
+              {shown.issues.map((issue, i) => (
+                <li key={i} className="text-sm">
+                  <span className="rounded bg-rule px-1.5 py-0.5 text-[10px] tracking-wide text-muted uppercase">
+                    {issue.kind}
+                  </span>{" "}
+                  <span className="reading text-base text-ink">{issue.text}</span>
+                  <span className="block text-xs text-muted">{issue.why}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-sm text-muted">Nothing wrong with this one.</p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Feedback({ grade, savedVocab }: { grade: Grade; savedVocab: boolean }) {
   const [showReference, setShowReference] = useState(false);
   const verdict = VERDICTS[grade.verdict] ?? VERDICTS.partial;
@@ -59,6 +170,8 @@ export default function Feedback({ grade, savedVocab }: { grade: Grade; savedVoc
           </p>
         </div>
       </div>
+
+      <SentenceMap grade={grade} />
 
       {grade.corrections && grade.corrections.length > 0 && (
         <section className="space-y-2">
