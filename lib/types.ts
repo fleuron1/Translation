@@ -141,6 +141,8 @@ export type Settings = {
   maxChars: number;
   model: string;
   showContext: boolean;
+  /** Check each clause on a typing pause, rather than only on submit. */
+  liveCheck: boolean;
 };
 
 export const LANGUAGES: { code: string; name: string; gutenberg: string }[] = [
@@ -163,4 +165,5 @@ export const DEFAULT_SETTINGS: Settings = {
   maxChars: 320,
   model: "",
   showContext: true,
+  liveCheck: true,
 };

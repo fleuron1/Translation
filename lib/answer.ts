@@ -24,8 +24,17 @@ export type Span = { start: number; end: number };
 const ABBREV =
   /\b(?:Sr|Sra|Srta|Dr|Dra|Dña|Ud|Uds|Vd|Prof|Mr|Mrs|Ms|St|etc|vs|núm|pág|págs|cap|vol|fig|art|approx|no)\.$/i;
 
-const TERMINAL = /[.!?…]/;
-const TRAILING = /[.!?…»”"'’)\]]/;
+/**
+ * Semicolons and colons count as boundaries, not just full stops. A learner
+ * writing one long sentence — "there were four walls, a floor and a roof;
+ * and the room held a stove" — otherwise gets a single undifferentiated
+ * block to correct, which is the opposite of useful.
+ *
+ * Commas are deliberately NOT boundaries: in that same sentence they separate
+ * items in a list, and splitting there would shred ordinary prose.
+ */
+const TERMINAL = /[.!?…;:]/;
+const TRAILING = /[.!?…;:»”"'’)\]]/;
 
 export function splitAnswer(text: string): Span[] {
   const spans: Span[] = [];

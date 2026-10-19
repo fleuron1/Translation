@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Feedback from "./Feedback";
+import LiveCheck from "./LiveCheck";
 import WordText from "./WordText";
 import { prefetch } from "@/lib/glossary";
 import { langName } from "@/lib/types";
@@ -346,6 +347,18 @@ export default function Reader({
           }
           className="w-full resize-y rounded-lg border border-rule bg-card p-3 text-base leading-relaxed"
         />
+
+        {/* Only while composing: once graded, the full breakdown replaces it. */}
+        {!grade && (
+          <LiveCheck
+            source={passage}
+            answer={draft}
+            lang={book.lang}
+            direction={book.direction ?? "into-english"}
+            model={settings.model}
+            enabled={settings.liveCheck !== false}
+          />
+        )}
       </section>
 
       {error && (

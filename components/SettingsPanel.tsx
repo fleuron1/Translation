@@ -119,6 +119,24 @@ export default function SettingsPanel({ settings, onChange, onClose }: Props) {
               </span>
             </span>
           </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={settings.liveCheck !== false}
+              onChange={(event) => onChange({ ...settings, liveCheck: event.target.checked })}
+              className="mt-1"
+            />
+            <span>
+              <span className="text-sm font-medium">Check each clause as I write</span>
+              <span className="mt-0.5 block text-xs text-faint">
+                A quick pass on a typing pause, so mistakes show up while the sentence is still in
+                your head. Each clause is only ever checked once, so correcting the end of a
+                paragraph does not re-check the start. Turn it off to spend nothing until you
+                submit.
+              </span>
+            </span>
+          </label>
         </div>
       </div>
     </div>
