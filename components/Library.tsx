@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PdfImport from "./PdfImport";
 import { LEVEL_LABEL, STARTERS } from "@/lib/starters";
 import { langName } from "@/lib/types";
 import type { Book, Progress, SearchResult, Settings } from "@/lib/types";
@@ -281,7 +282,7 @@ export default function Library({
 
         <div>
           <h2 className="mb-2 text-xs font-semibold tracking-wide text-faint uppercase">
-            Your own text
+            Your own material
           </h2>
           {pasteOpen ? (
             <form
@@ -321,12 +322,17 @@ export default function Library({
               paste a chapter, an article, anything
             </button>
           )}
+
+          <div className="mt-3 border-t border-rule pt-3">
+            <PdfImport settings={settings} onAdd={onAdd} />
+          </div>
         </div>
       </section>
 
       <footer className="border-t border-rule pt-4 text-xs text-faint">
-        Book texts come from Project Gutenberg and are in the public domain. Grading, hints and
-        glosses run through the Gemini API with your own key.
+        Book texts come from Project Gutenberg and are in the public domain. A PDF you open is read
+        on this machine and never uploaded. Grading, hints and glosses run through the Gemini API
+        with your own key.
       </footer>
     </div>
   );

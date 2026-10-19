@@ -36,7 +36,7 @@ export type Book = {
   title: string;
   author: string;
   lang: string;
-  source: "gutenberg" | "paste";
+  source: "gutenberg" | "paste" | "pdf";
   gutenbergId?: number;
   passages: string[];
   chapters: { title: string; index: number }[];

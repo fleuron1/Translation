@@ -31,7 +31,7 @@ Vercel: import the repo, set `GEMINI_API_KEY` and `APP_PASSWORD` as environment 
 
 ## The loop
 
-- **Pick a book.** Seven hand-checked Spanish starters are on the shelf, from a dialogue-heavy Galdós play up to *Don Quijote*. You can also search Project Gutenberg, open any catalogue number, or paste your own text.
+- **Pick a book.** Seven hand-checked Spanish starters are on the shelf, from a dialogue-heavy Galdós play up to *Don Quijote*. You can also search Project Gutenberg, open any catalogue number, paste your own text, or open a PDF from your computer.
 - **Read a passage.** Click any word for a one-word gloss — enough to get unstuck, never the sentence.
 - **Say what it means,** in your own English.
 - **Get graded.** A score out of 100, what you got, what you missed, any actual misreadings with the original beside them, and — only if you ask — one full translation to compare against.
@@ -54,6 +54,8 @@ If you are stuck, three hints escalate on purpose:
 | `app/api/grade/route.ts` | The grading prompt — the heart of the app |
 | `app/api/hint/route.ts` | The three hint rungs, plus reveal |
 | `lib/segment.ts` | Splits a book into translation-sized passages |
+| `lib/pdf.ts` | Opens a PDF in the browser and walks its pages |
+| `lib/pdf-text.ts` | Rebuilds prose from glyph positions (no pdf.js import, so it is testable alone) |
 | `lib/language.ts` | Finds where the book actually starts |
 | `lib/gutenberg.ts` | Download, search, strip boilerplate |
 
@@ -66,5 +68,7 @@ The whole personality of the app is the system prompt in `app/api/grade/route.ts
 - **Books.** Public-domain texts from Project Gutenberg, downloaded when you open one. Nothing is bundled with this repo.
 - **Real editions are messy.** Many Gutenberg files wrap the book in an English introduction, endnotes and a glossary. `lib/language.ts` finds the longest run of actual target-language text and trims the rest — on *El sombrero de tres picos* that drops 77 passages of front matter and 920 of editorial apparatus.
 - **Your data is yours.** Books, progress and saved words live in your browser's IndexedDB. The server stores nothing.
+- **PDFs are read locally.** A PDF you open is parsed in the browser and never uploaded — partly for privacy, partly because book PDFs run well past Vercel's 4.5MB request limit. Only the passage being graded leaves the machine.
+- **A PDF has no paragraphs,** only glyphs at coordinates, so `lib/pdf-text.ts` reconstructs them: it strips the running header and page numbers, rejoins words hyphenated across a line break, treats an indent or an opening dash as a new paragraph, and stitches a paragraph back together when it spans a page break. A scanned PDF with no text layer is detected and rejected with a note about OCR, rather than silently yielding nothing.
 - **Cost.** One grade is one Gemini call on a short passage; hints and glosses are smaller. `gemini-flash-latest` is the default, an alias that tracks the current flash model. Settings lists the models your key can actually reach.
 - **Other languages.** French, German, Italian, Portuguese, Dutch and Latin are wired up in Settings — search Gutenberg for a book in one. The curated shelf is Spanish only; add to `lib/starters.ts` to extend it.
