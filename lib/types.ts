@@ -17,7 +17,11 @@ export type Grade = {
   vocab: { term: string; english: string; note?: string }[];
   reference: string;
   note: string;
-  /** The answer as it was split for grading, so the UI tints exactly what was judged. */
+  /** The exact string that was graded, shown back verbatim rather than reflowed. */
+  answerText?: string;
+  /** Ranges into answerText, so spacing and line breaks survive the round trip. */
+  answerSpans?: { start: number; end: number }[];
+  /** Kept for attempts graded before spans existed. */
   answerSentences?: string[];
   sentences?: SentenceVerdict[];
   /** Language errors, when you are the one writing the foreign language. */

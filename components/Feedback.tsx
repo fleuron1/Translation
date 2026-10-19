@@ -63,12 +63,70 @@ function SentenceMap({ grade }: { grade: Grade }) {
   const [pinned, setPinned] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
 
-  const sentences = grade.answerSentences ?? [];
   const verdicts = new Map((grade.sentences ?? []).map((v) => [v.index, v]));
-  if (sentences.length === 0 || verdicts.size === 0) return null;
+
+  // Attempts graded before spans existed only kept the strings; rebuild
+  // offsets for them so an old attempt still shows its breakdown.
+  const text = grade.answerText ?? (grade.answerSentences ?? []).join(" ");
+  let spans = grade.answerSpans;
+  if (!spans && grade.answerSentences) {
+    let at = 0;
+    spans = grade.answerSentences.map((sentence) => {
+      const span = { start: at, end: at + sentence.length };
+      at += sentence.length + 1;
+      return span;
+    });
+  }
+
+  if (!text || !spans?.length || verdicts.size === 0) return null;
 
   const active = pinned ?? hovered;
   const shown = active === null ? null : verdicts.get(active);
+
+  // Walk the answer, tinting the graded ranges and emitting everything
+  // between them untouched, so the learner sees what they actually wrote.
+  const pieces: React.ReactNode[] = [];
+  let cursor = 0;
+  spans.forEach((span, index) => {
+    if (span.start > cursor) {
+      pieces.push(<span key={`gap-${index}`}>{text.slice(cursor, span.start)}</span>);
+    }
+    const body = text.slice(span.start, span.end);
+    const verdict = verdicts.get(index);
+    if (!verdict) {
+      pieces.push(
+        <span key={index} className="text-muted">
+          {body}
+        </span>,
+      );
+    } else {
+      const band = bandFor(verdict.score);
+      const isActive = active === index;
+      pieces.push(
+        <button
+          key={index}
+          type="button"
+          aria-expanded={isActive}
+          aria-label={`Sentence ${index + 1}, ${verdict.score} out of 100, ${band.label}`}
+          onMouseEnter={() => setHovered(index)}
+          onMouseLeave={() => setHovered((current) => (current === index ? null : current))}
+          onFocus={() => setHovered(index)}
+          onBlur={() => setHovered((current) => (current === index ? null : current))}
+          onClick={() => setPinned((current) => (current === index ? null : index))}
+          className={`${band.tint} ${band.edge} cursor-pointer rounded border-b-2 text-left transition ${
+            isActive ? "ring-2 ring-accent" : ""
+          }`}
+        >
+          <span className="reading text-base">{body}</span>
+          <span className={`ml-1 align-super text-[10px] font-semibold ${band.text}`}>
+            {verdict.score}
+          </span>
+        </button>,
+      );
+    }
+    cursor = span.end;
+  });
+  if (cursor < text.length) pieces.push(<span key="tail">{text.slice(cursor)}</span>);
 
   return (
     <section>
@@ -79,41 +137,7 @@ function SentenceMap({ grade }: { grade: Grade }) {
         Tap a sentence to keep its notes open.
       </p>
 
-      <p className="leading-loose">
-        {sentences.map((sentence, index) => {
-          const verdict = verdicts.get(index);
-          if (!verdict) {
-            return (
-              <span key={index} className="text-muted">
-                {sentence}{" "}
-              </span>
-            );
-          }
-          const band = bandFor(verdict.score);
-          const isActive = active === index;
-          return (
-            <button
-              key={index}
-              type="button"
-              aria-expanded={isActive}
-              aria-label={`Sentence ${index + 1}, ${verdict.score} out of 100, ${band.label}`}
-              onMouseEnter={() => setHovered(index)}
-              onMouseLeave={() => setHovered((current) => (current === index ? null : current))}
-              onFocus={() => setHovered(index)}
-              onBlur={() => setHovered((current) => (current === index ? null : current))}
-              onClick={() => setPinned((current) => (current === index ? null : index))}
-              className={`${band.tint} ${band.edge} mr-1 cursor-pointer rounded border-b-2 px-1 text-left transition ${
-                isActive ? "ring-2 ring-accent" : ""
-              }`}
-            >
-              <span className="reading text-base">{sentence}</span>
-              <span className={`ml-1 align-super text-[10px] font-semibold ${band.text}`}>
-                {verdict.score}
-              </span>
-            </button>
-          );
-        })}
-      </p>
+      <p className="leading-loose whitespace-pre-wrap">{pieces}</p>
 
       {shown && (
         <div className="rise mt-3 rounded-lg border border-rule bg-paper p-3">

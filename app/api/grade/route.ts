@@ -1,23 +1,8 @@
 import { NextResponse } from "next/server";
 import { askJson, errorResponse } from "@/lib/gemini";
-import { splitSentences } from "@/lib/segment";
+import { splitAnswer } from "@/lib/answer";
 import { langName } from "@/lib/types";
 import type { Direction, Grade, SentenceVerdict } from "@/lib/types";
-
-/**
- * The server splits the answer and hands the model NUMBERED sentences, then
- * takes back judgements keyed by those numbers. Quoting text back would mean
- * fuzzy-matching the model's version of the answer against the real one; an
- * index cannot drift, and the exact segments go back to the UI so what gets
- * tinted is precisely what was judged.
- */
-function sentencesOf(answer: string): string[] {
-  return answer
-    .split("\n")
-    .flatMap((line) => splitSentences(line.trim()))
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-}
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -251,7 +236,10 @@ export async function POST(request: Request) {
         ? `THE LEARNER'S ${language.toUpperCase()}:\n"""\n${userText}\n"""`
         : `WHAT THE LEARNER UNDERSTOOD, IN ENGLISH:\n"""\n${userText}\n"""`,
     );
-    const answerSentences = sentencesOf(userText);
+    // Spans into the graded string, so the panel can show the answer back
+    // exactly as written rather than a reflowed copy of it.
+    const answerSpans = splitAnswer(userText);
+    const answerSentences = answerSpans.map((span) => userText.slice(span.start, span.end));
     parts.push(
       `THE SAME ANSWER, SPLIT INTO NUMBERED SENTENCES. Judge each one on its own and return a verdict for every number, using these numbers exactly:\n` +
         answerSentences.map((sentence, i) => `[${i}] ${sentence}`).join("\n"),
@@ -288,17 +276,26 @@ export async function POST(request: Request) {
     const verdicts: SentenceVerdict[] = [];
     for (const verdict of grade.sentences ?? []) {
       const index = Number(verdict?.index);
-      if (!Number.isInteger(index) || index < 0 || index >= answerSentences.length) continue;
+      if (!Number.isInteger(index) || index < 0 || index >= answerSpans.length) continue;
       if (seen.has(index)) continue;
+
+      // A missing score must not become zero: that would paint a sentence red
+      // for a judgement the model never actually made. Drop it and leave the
+      // sentence untinted instead.
+      const score = Number(verdict?.score);
+      if (!Number.isFinite(score)) continue;
+
       seen.add(index);
       verdicts.push({
         index,
-        score: Math.max(0, Math.min(100, Math.round(Number(verdict.score) || 0))),
+        score: Math.max(0, Math.min(100, Math.round(score))),
         issues: Array.isArray(verdict.issues) ? verdict.issues : [],
         note: verdict.note,
       });
     }
 
+    grade.answerText = userText;
+    grade.answerSpans = answerSpans;
     grade.answerSentences = answerSentences;
     grade.sentences = verdicts.sort((a, b) => a.index - b.index);
 
