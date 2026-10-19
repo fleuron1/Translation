@@ -29,6 +29,27 @@ Vercel: import the repo, set `GEMINI_API_KEY` and `APP_PASSWORD` as environment 
 - **Unset on a deployment:** the app locks itself and says so, rather than coming up open.
 - Signing in sets an HTTP-only cookie for 30 days. The cookie holds an HMAC of the password, not the password.
 
+## Keeping your place across devices
+
+Optional. Without it the app is unchanged — everything lives in the browser. With it, your position in each book, your graded attempts and your saved words follow you between machines.
+
+1. Create a Supabase project (via the Vercel marketplace if you like, so the billing stays in one place).
+2. Paste `supabase/schema.sql` into the Supabase SQL editor and run it once.
+3. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, locally and in Vercel.
+4. Set `CRON_SECRET` to a long random string. `vercel.json` runs `/api/keepalive` daily.
+
+**Why the keep-alive matters.** Supabase pauses a free project after roughly a week of inactivity, and unpausing is a manual trip to their dashboard. For an app whose whole job is remembering where you stopped reading, a fortnight away is ordinary behaviour, not neglect — so the thing that would break it is the thing it exists for. A daily query keeps the project awake. The endpoint is outside the password gate, so `CRON_SECRET` is what keeps it private.
+
+### How it syncs
+
+The browser stays authoritative. Every write lands in IndexedDB first and the UI never waits on the network, so the app is as fast and as usable offline as before; the server copy is what survives a cleared browser or a new laptop. Writes go through an outbox in `localStorage` that survives a reload and retries when you come back online.
+
+Merging is last-write-wins per record, except attempts and vocabulary, which are only ever added to — a grade is never lost to a stale device.
+
+**Positions are not stored as integers.** A passage index is not a durable address: the segmenter changes, and `maxChars` is a setting you can move, so the same book numbers differently on two devices. Progress travels with a fingerprint of the passage text, and attempts are keyed by a hash of the passage they graded. On arrival the position is relocated by finding which passage now *contains* that text. Tested by segmenting one book at two different sizes and carrying positions across: all six probes landed on the right sentence, where a bare index would have been wrong in four of them.
+
+Books themselves are not uploaded. A Gutenberg book is stored as its catalogue number and rebuilt on the other device; pasted text is carried when it is small; a PDF stays on the machine that opened it, and the shelf says so rather than offering a book it cannot build.
+
 ## The loop
 
 - **Pick a book.** Seven hand-checked Spanish starters are on the shelf, from a dialogue-heavy Galdós play up to *Don Quijote*. You can also search Project Gutenberg, open any catalogue number, paste your own text, or open a PDF from your computer.

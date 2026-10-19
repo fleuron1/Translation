@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchBookText, readHeader, stripBoilerplate } from "@/lib/gutenberg";
-import { segment } from "@/lib/segment";
+import { SEGMENTER_VERSION, segment } from "@/lib/segment";
 import type { Book } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -51,6 +51,8 @@ export async function POST(request: Request) {
         passages,
         chapters,
         addedAt: Date.now(),
+        maxChars,
+        segmenterVersion: SEGMENTER_VERSION,
         skipped: trimmed ?? undefined,
       };
       return NextResponse.json({ book, detectedLanguage: header.language ?? null, trimmed });
@@ -78,6 +80,8 @@ export async function POST(request: Request) {
       passages,
       chapters,
       addedAt: Date.now(),
+      maxChars,
+      segmenterVersion: SEGMENTER_VERSION,
     };
     return NextResponse.json({ book, detectedLanguage: null });
   } catch (error) {

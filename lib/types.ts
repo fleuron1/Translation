@@ -25,6 +25,8 @@ export type Gloss = {
 
 export type Attempt = {
   index: number;
+  /** Hash of the passage this graded, so it survives re-segmentation. */
+  textHash?: string;
   userText: string;
   grade: Grade;
   hintsUsed: number;
@@ -51,6 +53,9 @@ export type Book = {
   passages: string[];
   chapters: { title: string; index: number }[];
   addedAt: number;
+  /** Settings the passages were produced with, needed to rebuild elsewhere. */
+  maxChars?: number;
+  segmenterVersion?: string;
   /** What was cut when the book was loaded, so the reader can say so. */
   skipped?: TrimReport;
 };
@@ -58,6 +63,9 @@ export type Book = {
 export type Progress = {
   bookId: string;
   index: number;
+  /** Fingerprint of the passage at index, used to relocate after renumbering. */
+  anchor?: string;
+  segmenterVersion?: string;
   attempts: Record<number, Attempt>;
   updatedAt: number;
 };

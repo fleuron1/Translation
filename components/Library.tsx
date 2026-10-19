@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PdfImport from "./PdfImport";
+import type { RemoteBook } from "@/lib/sync";
 import { LEVEL_LABEL, STARTERS } from "@/lib/starters";
 import { langName } from "@/lib/types";
 import type { Book, Progress, SearchResult, Settings } from "@/lib/types";
@@ -17,6 +18,8 @@ type Props = {
   onOpenSettings: () => void;
   onOpenWords: () => void;
   wordCount: number;
+  remoteBooks: RemoteBook[];
+  onRebuildRemote: (remote: RemoteBook) => Promise<void>;
 };
 
 export default function Library({
@@ -28,9 +31,23 @@ export default function Library({
   onOpenSettings,
   onOpenWords,
   wordCount,
+  remoteBooks,
+  onRebuildRemote,
 }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function rebuild(remote: RemoteBook) {
+    setLoading(`remote-${remote.id}`);
+    setError(null);
+    try {
+      await onRebuildRemote(remote);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rebuild that book.");
+    } finally {
+      setLoading(null);
+    }
+  }
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
@@ -150,6 +167,45 @@ export default function Library({
                   >
                     remove
                   </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {remoteBooks.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-xs font-semibold tracking-wide text-faint uppercase">
+            On your other devices
+          </h2>
+          <ul className="space-y-2">
+            {remoteBooks.map((remote) => {
+              const rebuildable = Boolean(remote.gutenbergId || remote.textContent);
+              return (
+                <li
+                  key={remote.id}
+                  className="flex items-center gap-3 rounded-lg border border-dashed border-rule bg-card/50 p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{remote.title}</p>
+                    <p className="truncate text-xs text-muted">
+                      {remote.author}
+                      {rebuildable
+                        ? " · your place is saved; the text downloads here"
+                        : " · this one was a PDF, so open the file again on this device"}
+                    </p>
+                  </div>
+                  {rebuildable && (
+                    <button
+                      type="button"
+                      disabled={loading !== null}
+                      onClick={() => rebuild(remote)}
+                      className="shrink-0 rounded-lg border border-rule px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-accent disabled:opacity-40"
+                    >
+                      {loading === `remote-${remote.id}` ? "building…" : "continue"}
+                    </button>
+                  )}
                 </li>
               );
             })}

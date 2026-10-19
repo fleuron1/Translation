@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { segment } from "@/lib/segment";
+import { SEGMENTER_VERSION, segment } from "@/lib/segment";
 import { extractPdf, readPdfInfo, type PdfProgress } from "@/lib/pdf";
 import type { Book, Settings } from "@/lib/types";
 
@@ -83,6 +83,8 @@ export default function PdfImport({ settings, onAdd }: Props) {
         passages,
         chapters,
         addedAt: Date.now(),
+        maxChars: settings.maxChars,
+        segmenterVersion: SEGMENTER_VERSION,
         skipped: trimmed ?? undefined,
       });
     } catch (e) {

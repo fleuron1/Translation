@@ -7,6 +7,16 @@ import SettingsPanel from "@/components/SettingsPanel";
 import VocabList from "@/components/VocabList";
 import { books as bookStore, progress as progressStore, vocab as vocabStore, vocabKey } from "@/lib/db";
 import { loadSettings, saveSettings } from "@/lib/settings";
+import {
+  pull,
+  pullAttempts,
+  recordAttempt,
+  recordBook,
+  recordProgress,
+  recordVocab,
+  startSync,
+  type RemoteBook,
+} from "@/lib/sync";
 import { DEFAULT_SETTINGS } from "@/lib/types";
 import type { Book, Progress, Settings, VocabEntry } from "@/lib/types";
 
@@ -22,6 +32,8 @@ export default function Home() {
   const [progressById, setProgressById] = useState<Record<string, Progress>>({});
   const [vocab, setVocab] = useState<VocabEntry[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
+  /** Books the server knows about that this device has not built yet. */
+  const [remoteBooks, setRemoteBooks] = useState<RemoteBook[]>([]);
 
   const refresh = useCallback(async () => {
     const [allBooks, allProgress, allVocab] = await Promise.all([
@@ -36,7 +48,20 @@ export default function Home() {
 
   useEffect(() => {
     setSettings(loadSettings());
-    refresh().finally(() => setReady(true));
+    const stopSync = startSync();
+
+    // Local data first so the shelf paints immediately, then fold in the
+    // server's copy and repaint. Reading never waits on the network.
+    refresh()
+      .then(() => setReady(true))
+      .then(() => pull())
+      .then(async (elsewhere) => {
+        setRemoteBooks(elsewhere);
+        await refresh();
+      })
+      .catch(() => setReady(true));
+
+    return stopSync;
   }, [refresh]);
 
   function changeSettings(next: Settings) {
@@ -50,9 +75,10 @@ export default function Home() {
     if (!existing) {
       await progressStore.put({ bookId: book.id, index: 0, attempts: {}, updatedAt: Date.now() });
     }
+    recordBook(book);
+    setRemoteBooks((current) => current.filter((remote) => remote.id !== book.id));
     await refresh();
-    setCurrentId(book.id);
-    setView("read");
+    await openBook(book.id);
   }
 
   async function removeBook(id: string) {
@@ -61,9 +87,36 @@ export default function Home() {
     await refresh();
   }
 
+  /** Opening a book is when its graded attempts are worth fetching. */
+  async function openBook(id: string) {
+    setCurrentId(id);
+    setView("read");
+
+    const book = (await bookStore.get(id)) ?? null;
+    const existing = await progressStore.get(id);
+    if (!book || !existing) return;
+
+    const merged = await pullAttempts(book, existing);
+    if (merged !== existing) {
+      setProgressById((current) => ({ ...current, [id]: merged }));
+    }
+  }
+
   async function updateProgress(next: Progress) {
+    const previous = progressById[next.bookId];
     setProgressById((current) => ({ ...current, [next.bookId]: next }));
     await progressStore.put(next);
+
+    const book = shelf.find((b) => b.id === next.bookId);
+    if (!book) return;
+
+    if (!previous || previous.index !== next.index) recordProgress(book, next);
+
+    // Anything newly graded goes up on its own, keyed to the passage text.
+    for (const [key, attempt] of Object.entries(next.attempts)) {
+      const before = previous?.attempts[Number(key)];
+      if (!before || before.at !== attempt.at) recordAttempt(book, attempt);
+    }
   }
 
   async function saveVocab(
@@ -89,7 +142,59 @@ export default function Home() {
         seen: (existing?.seen ?? 0) + 1,
       });
     }
-    setVocab(await vocabStore.all());
+    const all = await vocabStore.all();
+    setVocab(all);
+    recordVocab(all.filter((entry) => items.some((item) => item.term === entry.term)));
+  }
+
+  /**
+   * A book read on another device. Gutenberg books and pasted text can be
+   * rebuilt here from the reference the server kept; a PDF cannot, since its
+   * text never left the machine that opened it.
+   */
+  async function rebuildRemote(remote: RemoteBook) {
+    const response = await fetch("/api/book", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        remote.gutenbergId
+          ? {
+              gutenbergId: remote.gutenbergId,
+              title: remote.title,
+              author: remote.author,
+              lang: remote.lang,
+              maxChars: remote.maxChars,
+            }
+          : {
+              text: remote.textContent,
+              title: remote.title,
+              author: remote.author,
+              lang: remote.lang,
+              maxChars: remote.maxChars,
+            },
+      ),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Could not rebuild that book.");
+
+    // Keep the server's id so the progress row already waiting matches up.
+    const book = { ...(data.book as Book), id: remote.id };
+    await bookStore.put(book);
+
+    const saved = await progressStore.get(remote.id);
+    if (saved) {
+      // The position was stored before this device had the text to check it
+      // against, so settle it now against the passages we just built.
+      const { relocate } = await import("@/lib/anchor");
+      const { index } = relocate(book.passages, saved.anchor ?? "", saved.index);
+      if (index !== saved.index) await progressStore.put({ ...saved, index });
+    } else {
+      await progressStore.put({ bookId: remote.id, index: 0, attempts: {}, updatedAt: Date.now() });
+    }
+
+    setRemoteBooks((current) => current.filter((entry) => entry.id !== remote.id));
+    await refresh();
+    await openBook(remote.id);
   }
 
   async function removeVocab(key: string) {
@@ -129,10 +234,9 @@ export default function Home() {
           settings={settings}
           shelf={shelf.map((book) => ({ book, progress: progressById[book.id] }))}
           wordCount={vocab.length}
-          onOpen={(id) => {
-            setCurrentId(id);
-            setView("read");
-          }}
+          remoteBooks={remoteBooks}
+          onRebuildRemote={rebuildRemote}
+          onOpen={openBook}
           onAdd={addBook}
           onRemove={removeBook}
           onOpenSettings={() => setSettingsOpen(true)}

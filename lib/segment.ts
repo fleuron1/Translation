@@ -3,6 +3,13 @@ import { findBodyStart } from "./frontmatter";
 import type { TrimReport } from "./types";
 
 /**
+ * Bump this whenever a change can move passage boundaries. Stored reading
+ * positions carry it so they can be relocated instead of silently pointing
+ * at the wrong sentence.
+ */
+export const SEGMENTER_VERSION = "4";
+
+/**
  * Turns a raw public-domain book file into translation-sized passages.
  *
  * Gutenberg plain text is hard-wrapped at ~70 columns, so lines have to be

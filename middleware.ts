@@ -22,8 +22,11 @@ function deny(request: NextRequest, status: number, message: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // The gate itself has to stay reachable.
-  if (pathname === "/login" || pathname === "/api/login") return NextResponse.next();
+  // The gate itself has to stay reachable, and so does the cron that keeps
+  // the database awake — it carries CRON_SECRET instead of the site password.
+  if (pathname === "/login" || pathname === "/api/login" || pathname === "/api/keepalive") {
+    return NextResponse.next();
+  }
 
   const password = configuredPassword();
 
