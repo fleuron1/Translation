@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import AnswerEditor from "./AnswerEditor";
 import Feedback from "./Feedback";
-import LiveCheck from "./LiveCheck";
 import WordText from "./WordText";
 import { prefetch } from "@/lib/glossary";
 import { langName } from "@/lib/types";
@@ -332,33 +332,22 @@ export default function Reader({
             ? `Simple and correct beats ambitious and wrong. Both the meaning and your ${target} are marked.`
             : "Your own words are fine. Say the ideas; nobody is grading your prose."}
         </p>
-        <textarea
-          id="answer"
-          ref={box}
+        <AnswerEditor
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={setDraft}
           onKeyDown={onKeyDown}
-          rows={5}
-          spellCheck
           placeholder={
             producing
               ? `Write the passage in ${target}…`
               : "He is making an excuse, and it is obviously not the real reason…"
           }
-          className="w-full resize-y rounded-lg border border-rule bg-card p-3 text-base leading-relaxed"
+          source={passage}
+          lang={book.lang}
+          direction={book.direction ?? "into-english"}
+          model={settings.model}
+          // Once graded, the full breakdown below replaces the live marks.
+          enabled={settings.liveCheck !== false && !grade}
         />
-
-        {/* Only while composing: once graded, the full breakdown replaces it. */}
-        {!grade && (
-          <LiveCheck
-            source={passage}
-            answer={draft}
-            lang={book.lang}
-            direction={book.direction ?? "into-english"}
-            model={settings.model}
-            enabled={settings.liveCheck !== false}
-          />
-        )}
       </section>
 
       {error && (

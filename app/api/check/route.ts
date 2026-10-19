@@ -33,20 +33,39 @@ const SCHEMA = {
             description:
               "ok: right, or near enough. warn: understandable but off. bad: wrong, or says something the passage does not.",
           },
-          issue: {
-            type: "STRING",
+          faults: {
+            type: "ARRAY",
             description:
-              "What is wrong, in under twelve words, naming the fault. Omit entirely when the state is ok.",
+              "The specific fragments at fault. Empty when the state is ok. Prefer the shortest span that is actually wrong — a word or a phrase, not the whole clause.",
+            items: {
+              type: "OBJECT",
+              properties: {
+                text: {
+                  type: "STRING",
+                  description:
+                    "The fragment copied EXACTLY from the clause, character for character, so it can be found in it. Never paraphrase it.",
+                },
+                instead: {
+                  type: "STRING",
+                  description: "What should be there instead. A few words, not a whole rewrite.",
+                },
+                why: { type: "STRING", description: "The reason, in under twelve words." },
+              },
+              required: ["text", "instead", "why"],
+            },
           },
         },
-        required: ["index", "state"],
+        required: ["index", "state", "faults"],
       },
     },
   },
   required: ["verdicts"],
 };
 
-type Result = { verdicts: { index: number; state: string; issue?: string }[] };
+type RawFault = { text?: unknown; instead?: unknown; why?: unknown };
+type Result = {
+  verdicts: { index: number; state: string; faults?: RawFault[] }[];
+};
 
 export async function POST(request: Request) {
   try {
@@ -66,9 +85,17 @@ export async function POST(request: Request) {
     const producing = direction === "into-target";
     const language = langName(body.lang ?? "es");
 
+    const common = `A clause may be CUT OFF MID-WORD or mid-thought, because it is being typed right now. Never say a clause is incomplete, unfinished, or missing something — judge only what is actually on the page, and say nothing at all about the rest. Marking a half-typed clause wrong is the one thing that makes this feature unusable.
+
+For every fault, copy the offending fragment out of the clause EXACTLY as it is written, character for character, so it can be found again in the text. Pick the shortest fragment that is genuinely wrong: the word or phrase, not the whole clause. Then say what belongs there instead, and why, in a few words each.`;
+
     const system = producing
-      ? `You check a learner's ${language} as they write it. They are a native English speaker rendering an English passage in ${language}, and the draft is UNFINISHED — never complain that something is missing or incomplete, only about what is actually written. For each clause: is its ${language} correct, and does it say something the passage supports? Flag agreement, conjugation, mood, prepositions, false friends and invented words. Be extremely terse: a few words naming the fault, no praise, no restating the clause.`
-      : `You check a learner's English as they write it. They are working out what a ${language} passage means, and the draft is UNFINISHED — never complain that something is missing or incomplete, only about what is actually written. For each clause: does it match what the ${language} actually says? Flag misreadings, flipped negatives, wrong subjects and invented content. Paraphrase and plain wording are fine. Be extremely terse: a few words naming the fault, no praise, no restating the clause.`;
+      ? `You check a learner's ${language} as they type it. They are a native English speaker rendering an English passage in ${language}. For each clause: is its ${language} correct, and does it say something the passage supports? Flag agreement, conjugation, mood, prepositions, false friends and invented words.
+
+${common}`
+      : `You check a learner's English as they type it. They are working out what a ${language} passage means. For each clause: does it match what the ${language} actually says? Flag misreadings, flipped negatives, wrong subjects and invented content. Paraphrase and plain wording are fine.
+
+${common}`;
 
     const { verdicts } = await askJson<Result>({
       model: body.model || process.env.CHECK_MODEL || "gemini-flash-lite-latest",
@@ -82,14 +109,29 @@ export async function POST(request: Request) {
       fast: true,
     });
 
-    const allowed = new Set(clauses.map((c) => c.index));
+    const byIndex = new Map(clauses.map((c) => [c.index, c.text]));
     const clean = (verdicts ?? [])
-      .filter((v) => allowed.has(Number(v?.index)))
-      .map((v) => ({
-        index: Number(v.index),
-        state: v.state === "bad" || v.state === "warn" ? v.state : "ok",
-        issue: typeof v.issue === "string" && v.issue.trim() ? v.issue.trim() : undefined,
-      }));
+      .filter((v) => byIndex.has(Number(v?.index)))
+      .map((v) => {
+        const clause = byIndex.get(Number(v.index)) ?? "";
+        // A fragment that is not literally in the clause cannot be underlined,
+        // so it is dropped rather than guessed at.
+        const faults = (Array.isArray(v.faults) ? v.faults : [])
+          .map((f) => ({
+            text: typeof f?.text === "string" ? f.text.trim() : "",
+            instead: typeof f?.instead === "string" ? f.instead.trim() : "",
+            why: typeof f?.why === "string" ? f.why.trim() : "",
+          }))
+          .filter((f) => f.text && clause.includes(f.text));
+
+        const state = v.state === "bad" || v.state === "warn" ? v.state : "ok";
+        return {
+          index: Number(v.index),
+          // Nothing locatable to show means there is nothing to mark.
+          state: faults.length === 0 ? "ok" : state,
+          faults,
+        };
+      });
 
     return NextResponse.json({ verdicts: clean });
   } catch (error) {
