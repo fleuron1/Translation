@@ -41,7 +41,7 @@ const keyFor = (lang: string, direction: Direction, source: string, clause: stri
  * the wrong place. Both layers inherit from the page instead.
  */
 const TYPOGRAPHY =
-  "w-full rounded-lg border border-rule p-3 text-base leading-relaxed whitespace-pre-wrap break-words";
+  "w-full rounded-lg border p-3 text-base leading-relaxed whitespace-pre-wrap break-words";
 
 const LOOK = {
   bad: "underline decoration-wavy decoration-2 underline-offset-4 decoration-[var(--bad)] bg-bad/10 rounded-sm",
@@ -198,10 +198,16 @@ export default function AnswerEditor({
 
   return (
     <div className="relative">
+      {/*
+        The mirror carries the background, the border and the visible text.
+        The textarea on top is completely transparent, so nothing it paints
+        can hide the marks underneath — giving IT the background was what made
+        the whole layer invisible.
+      */}
       <div
         ref={mirror}
         aria-hidden
-        className={`${TYPOGRAPHY} pointer-events-none absolute inset-0 overflow-hidden border-transparent text-ink`}
+        className={`${TYPOGRAPHY} pointer-events-none absolute inset-0 overflow-hidden border-rule bg-card text-ink`}
       >
         {pieces}
       </div>
@@ -227,9 +233,12 @@ export default function AnswerEditor({
           setPinned(hit ? marks.indexOf(hit.mark) : null);
         }}
         rows={5}
-        spellCheck
+        // The browser's own spellchecker underlines in red too, and on Spanish
+        // typed into an English-locale browser that is every single word. It
+        // buries the marks that mean something.
+        spellCheck={false}
         placeholder={placeholder}
-        className={`${TYPOGRAPHY} relative resize-y bg-card text-transparent caret-[var(--ink)] placeholder:text-faint`}
+        className={`${TYPOGRAPHY} relative resize-y border-transparent bg-transparent text-transparent caret-[var(--ink)] placeholder:text-faint`}
       />
 
       {enabled && (
