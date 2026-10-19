@@ -56,10 +56,18 @@ export function splitAnswer(text: string): Span[] {
     while (end + 1 < text.length && TRAILING.test(text[end + 1])) end++;
 
     const rest = text.slice(end + 1);
-    // No space after means it is inside something: 3.500, or a web address.
     if (rest !== "" && !/^\s/.test(rest)) {
-      i = end;
-      continue;
+      // No space after a full stop is usually "3.500" or "example.com" — but
+      // for a beginner it is just as often a missing space between sentences.
+      // Letter-dot-letter is a boundary; digits and addresses are not.
+      const before = text[i - 1] ?? "";
+      const after = rest[0];
+      const joinsWords = /\p{L}/u.test(before) && /\p{L}/u.test(after);
+      const addressy = /(?:https?:\/\/|www\.|@)/i.test(text.slice(Math.max(0, start), end + 8));
+      if (!joinsWords || addressy) {
+        i = end;
+        continue;
+      }
     }
     if (ABBREV.test(text.slice(start, end + 1))) {
       i = end;

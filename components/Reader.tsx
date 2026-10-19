@@ -33,7 +33,13 @@ export default function Reader({
   onExit,
   onOpenSettings,
 }: Props) {
-  const index = Math.max(0, Math.min(book.passages.length - 1, progress.index));
+  // A stored position is clamped rather than trusted. Anything non-numeric —
+  // from an older build, a hand-edited record, or a bad sync row — would
+  // otherwise index past the array and hand undefined to the passage view.
+  const stored = Number(progress.index);
+  const index = Number.isFinite(stored)
+    ? Math.max(0, Math.min(book.passages.length - 1, Math.trunc(stored)))
+    : 0;
   const passage = book.passages[index];
   const previous = index > 0 ? book.passages[index - 1] : null;
   const existing = progress.attempts[index];
@@ -96,7 +102,9 @@ export default function Reader({
   }, [book.chapters, index]);
 
   function go(to: number) {
-    const next = Math.max(0, Math.min(book.passages.length - 1, to));
+    const next = Number.isFinite(to)
+      ? Math.max(0, Math.min(book.passages.length - 1, Math.trunc(to)))
+      : 0;
     onProgress({ ...progress, index: next, updatedAt: Date.now() });
   }
 

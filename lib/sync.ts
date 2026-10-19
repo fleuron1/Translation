@@ -174,6 +174,28 @@ export function recordVocab(entries: VocabEntry[]): void {
   );
 }
 
+/**
+ * Everything arriving from the server is treated as untrusted.
+ *
+ * A row whose passage_index is not a number turns into NaN, and NaN survives
+ * IndexedDB — structured clone preserves it — so a single malformed row would
+ * store a position the reader can never resolve and break the book on every
+ * load until storage is cleared. Rows that do not make sense are skipped.
+ */
+function finite(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function wholeNumber(value: unknown, fallback = 0): number {
+  const n = finite(value);
+  return n === null ? fallback : Math.max(0, Math.trunc(n));
+}
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 export type RemoteBook = {
   id: string;
   title: string;
@@ -218,44 +240,62 @@ export async function pull(): Promise<RemoteBook[]> {
 
   // Vocabulary only ever grows; the newer sighting of a word wins.
   for (const row of data.vocab ?? []) {
-    const remote = row as unknown as Record<string, string | number | null>;
-    const key = String(remote.key);
+    const remote = row as unknown as Record<string, unknown>;
+    const key = text(remote.key);
+    const term = text(remote.term);
+    const english = text(remote.english);
+    if (!key || !term || !english) continue;
+
+    const at = finite(Date.parse(String(remote.at))) ?? Date.now();
     const existing = await vocabStore.get(key);
-    const at = Date.parse(String(remote.at));
     if (existing && existing.at >= at) continue;
+
     await vocabStore.put({
       key,
-      term: String(remote.term),
-      english: String(remote.english),
-      note: (remote.note as string) ?? undefined,
-      bookId: String(remote.book_id ?? ""),
-      bookTitle: String(remote.book_title ?? ""),
-      passageIndex: Number(remote.passage_index ?? 0),
-      lang: String(remote.lang ?? "es"),
+      term,
+      english,
+      note: text(remote.note) ?? undefined,
+      bookId: text(remote.book_id) ?? "",
+      bookTitle: text(remote.book_title) ?? "",
+      passageIndex: wholeNumber(remote.passage_index),
+      lang: text(remote.lang) ?? "es",
       at,
-      seen: Number(remote.seen ?? 1),
+      seen: Math.max(1, wholeNumber(remote.seen, 1)),
     });
   }
 
   for (const row of data.progress ?? []) {
-    const remote = row as unknown as Record<string, string | number | null>;
-    const bookId = String(remote.book_id);
-    const updatedAt = Date.parse(String(remote.updated_at));
+    const remote = row as unknown as Record<string, unknown>;
+    const bookId = text(remote.book_id);
+    if (!bookId) continue;
+
+    // A position that is not a number is not a position. Skipping the row
+    // leaves whatever this device already knows, which is always safer than
+    // overwriting it with something unusable.
+    const hint = finite(remote.passage_index);
+    if (hint === null) continue;
+
+    const updatedAt = finite(Date.parse(String(remote.updated_at))) ?? 0;
     const existing = await progressStore.get(bookId);
     if (existing && existing.updatedAt >= updatedAt) continue;
 
     const book = byId.get(bookId);
-    const anchor = (remote.anchor as string) ?? "";
-    const hint = Number(remote.passage_index ?? 0);
+    const anchor = text(remote.anchor) ?? "";
     // Without the book on this device the index cannot be checked yet; it is
     // relocated when the book is rebuilt.
-    const index = book ? relocate(book.passages, anchor, hint).index : hint;
+    const resolved = book
+      ? relocate(book.passages, anchor, Math.trunc(hint)).index
+      : Math.trunc(hint);
+    const index = book
+      ? Math.max(0, Math.min(book.passages.length - 1, resolved))
+      : Math.max(0, resolved);
+    if (!Number.isFinite(index)) continue;
 
     await progressStore.put({
       bookId,
       index,
       anchor,
-      segmenterVersion: (remote.segmenter_version as string) ?? undefined,
+      segmenterVersion: text(remote.segmenter_version) ?? undefined,
       attempts: existing?.attempts ?? {},
       updatedAt,
     });
