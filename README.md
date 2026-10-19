@@ -19,6 +19,16 @@ You are graded on **the ideas you got**, not on your wording. A rough, honest pa
 
 The key stays on the server — every Gemini call goes through a route handler, never from the browser.
 
+## Deploying
+
+Vercel: import the repo, set `GEMINI_API_KEY` and `APP_PASSWORD` as environment variables, deploy.
+
+`APP_PASSWORD` is a shared password protecting the whole site, pages and API alike. It matters because a deployed instance holds your Gemini key server-side — without a gate, anyone who finds the URL is spending your quota.
+
+- **Unset locally:** no gate, so `npm run dev` stays frictionless. Set it in `.env.local` to try the gate on your machine.
+- **Unset on a deployment:** the app locks itself and says so, rather than coming up open.
+- Signing in sets an HTTP-only cookie for 30 days. The cookie holds an HMAC of the password, not the password.
+
 ## The loop
 
 - **Pick a book.** Seven hand-checked Spanish starters are on the shelf, from a dialogue-heavy Galdós play up to *Don Quijote*. You can also search Project Gutenberg, open any catalogue number, or paste your own text.
