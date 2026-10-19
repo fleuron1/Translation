@@ -1,3 +1,10 @@
+/**
+ * Which way you are translating.
+ * "into-english" is comprehension: read the foreign text, say what it means.
+ * "into-target" is production: read English, write it in the language you are learning.
+ */
+export type Direction = "into-english" | "into-target";
+
 export type Verdict = "nailed" | "close" | "partial" | "off";
 
 export type Grade = {
@@ -10,6 +17,8 @@ export type Grade = {
   vocab: { term: string; english: string; note?: string }[];
   reference: string;
   note: string;
+  /** Language errors, when you are the one writing the foreign language. */
+  corrections?: { yours: string; better: string; why: string }[];
 };
 
 export type Hint = { level: number; text: string };
@@ -49,6 +58,8 @@ export type Book = {
   author: string;
   lang: string;
   source: "gutenberg" | "paste" | "pdf";
+  /** Defaults to into-english for books added before reverse mode existed. */
+  direction?: Direction;
   gutenbergId?: number;
   passages: string[];
   chapters: { title: string; index: number }[];
@@ -91,7 +102,9 @@ export type SearchResult = {
 };
 
 export type Settings = {
+  /** The language being learned, whichever side of the page it is on. */
   lang: string;
+  direction: Direction;
   maxChars: number;
   model: string;
   showContext: boolean;
@@ -113,6 +126,7 @@ export function langName(code: string): string {
 
 export const DEFAULT_SETTINGS: Settings = {
   lang: "es",
+  direction: "into-english",
   maxChars: 320,
   model: "",
   showContext: true,

@@ -64,8 +64,9 @@ export default function PdfImport({ settings, onAdd }: Props) {
       });
 
       // Segmenting here as well keeps the whole file on this machine.
+      const textLang = settings.direction === "into-target" ? "en" : settings.lang;
       const { passages, chapters, trimmed } = segment(extraction.text, settings.maxChars, {
-        lang: settings.lang,
+        lang: textLang,
         trimApparatus: false,
         trimFrontMatter: true,
       });
@@ -79,6 +80,7 @@ export default function PdfImport({ settings, onAdd }: Props) {
         title: chosen.title.trim() || "Untitled PDF",
         author: chosen.author.trim() || "Unknown",
         lang: settings.lang,
+        direction: settings.direction,
         source: "pdf",
         passages,
         chapters,

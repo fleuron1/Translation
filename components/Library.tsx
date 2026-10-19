@@ -20,6 +20,7 @@ type Props = {
   wordCount: number;
   remoteBooks: RemoteBook[];
   onRebuildRemote: (remote: RemoteBook) => Promise<void>;
+  onChangeSettings: (settings: Settings) => void;
 };
 
 export default function Library({
@@ -33,6 +34,7 @@ export default function Library({
   wordCount,
   remoteBooks,
   onRebuildRemote,
+  onChangeSettings,
 }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,10 @@ export default function Library({
   const [pasteText, setPasteText] = useState("");
   const [pasteTitle, setPasteTitle] = useState("");
 
+  const producing = settings.direction === "into-target";
+  /** The language of the TEXT, which is what trimming keys off. */
+  const textLang = producing ? "en" : settings.lang;
+
   async function load(payload: Record<string, unknown>, key: string) {
     setLoading(key);
     setError(null);
@@ -65,11 +71,13 @@ export default function Library({
       const response = await fetch("/api/book", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...payload, lang: settings.lang, maxChars: settings.maxChars }),
+        body: JSON.stringify({ ...payload, lang: textLang, maxChars: settings.maxChars }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not load that.");
-      onAdd(data.book as Book);
+      // A book carries the language being LEARNED plus which way it is read,
+      // so the grader knows which side the learner is writing on.
+      onAdd({ ...(data.book as Book), lang: settings.lang, direction: settings.direction });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load that.");
     } finally {
@@ -83,9 +91,7 @@ export default function Library({
     setSearching(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/search?q=${encodeURIComponent(query)}&lang=${settings.lang}`,
-      );
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&lang=${textLang}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Search failed.");
       setResults(data.results as SearchResult[]);
@@ -96,7 +102,9 @@ export default function Library({
     }
   }
 
-  const starters = STARTERS.filter((s) => s.lang === settings.lang);
+  const starters = STARTERS.filter(
+    (s) => s.direction === settings.direction && (producing || s.lang === settings.lang),
+  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-24 pt-10">
@@ -105,9 +113,20 @@ export default function Library({
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Gist</h1>
             <p className="mt-2 max-w-xl text-muted">
-              Read a real book in {langName(settings.lang)}, a passage at a time, and write down what
-              you think it means. You are graded on the ideas you got, not on your wording — a rough,
-              honest paraphrase scores better than a careful guess.
+              {producing ? (
+                <>
+                  Read a real book in English, a passage at a time, and write it in{" "}
+                  {langName(settings.lang)}. You are graded on whether the meaning survived and
+                  whether your {langName(settings.lang)} is actually correct — the two are marked
+                  separately.
+                </>
+              ) : (
+                <>
+                  Read a real book in {langName(settings.lang)}, a passage at a time, and write down
+                  what you think it means. You are graded on the ideas you got, not on your wording —
+                  a rough, honest paraphrase scores better than a careful guess.
+                </>
+              )}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1 text-sm">
@@ -120,6 +139,38 @@ export default function Library({
           </div>
         </div>
       </header>
+
+      <div
+        role="group"
+        aria-label="Which way you are translating"
+        className="mb-8 inline-flex rounded-lg border border-rule bg-card p-1 text-sm"
+      >
+        {(
+          [
+            ["into-english", `Read ${langName(settings.lang)} → write English`],
+            ["into-target", `Read English → write ${langName(settings.lang)}`],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={settings.direction === value}
+            onClick={() => onChangeSettings({ ...settings, direction: value })}
+            className={
+              settings.direction === value
+                ? "rounded-md bg-accent px-3 py-1.5 font-medium text-paper"
+                : "rounded-md px-3 py-1.5 text-muted hover:text-ink"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="-mt-6 mb-8 text-xs text-faint">
+        {producing
+          ? "Understanding a language and producing it are different skills. This side builds the second."
+          : "Books you have already started keep the direction they were added with."}
+      </p>
 
       {error && (
         <p className="mb-6 rounded-lg border border-bad/40 bg-bad/5 p-3 text-sm text-bad">{error}</p>
@@ -262,7 +313,7 @@ export default function Library({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={`Title or author, in ${langName(settings.lang)} or English`}
+            placeholder={producing ? "Title or author" : `Title or author, in ${langName(settings.lang)} or English`}
             className="min-w-0 flex-1 rounded-lg border border-rule bg-card px-3 py-2 text-sm"
           />
           <button
@@ -274,7 +325,7 @@ export default function Library({
           </button>
         </form>
         <p className="mt-2 text-xs text-faint">
-          Searches Project Gutenberg, restricted to {langName(settings.lang)}.
+          Searches Project Gutenberg, restricted to {producing ? "English" : langName(settings.lang)}.
         </p>
 
         {results && (

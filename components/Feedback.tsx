@@ -60,6 +60,25 @@ export default function Feedback({ grade, savedVocab }: { grade: Grade; savedVoc
         </div>
       </div>
 
+      {grade.corrections && grade.corrections.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-semibold tracking-wide text-faint uppercase">
+            Corrections
+          </h3>
+          <ul className="space-y-2">
+            {grade.corrections.map((item, i) => (
+              <li key={i} className="rounded-lg border-l-2 border-warn bg-paper p-3 text-sm">
+                <p className="reading text-base text-muted line-through decoration-warn/50">
+                  {item.yours}
+                </p>
+                <p className="reading mt-1 text-base text-ink">{item.better}</p>
+                <p className="mt-1 text-xs text-faint">{item.why}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {grade.wrong.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-xs font-semibold tracking-wide text-faint uppercase">Misreadings</h3>

@@ -1,63 +1,97 @@
 import { NextResponse } from "next/server";
 import { askJson, errorResponse } from "@/lib/gemini";
 import { langName } from "@/lib/types";
-import type { Grade } from "@/lib/types";
+import type { Direction, Grade } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const SCHEMA = {
+const WRONG_ITEM = {
   type: "OBJECT",
   properties: {
-    score: { type: "INTEGER", description: "0-100, how much of the meaning the learner got" },
+    yours: { type: "STRING", description: "What the learner wrote." },
+    actually: { type: "STRING", description: "What the original says." },
+    why: { type: "STRING", description: "One short clause on the cause of the slip." },
+  },
+  required: ["yours", "actually", "why"],
+};
+
+const CORRECTION_ITEM = {
+  type: "OBJECT",
+  properties: {
+    yours: { type: "STRING", description: "The learner's phrase, exactly as written." },
+    better: { type: "STRING", description: "The corrected phrase, changing as little as possible." },
+    why: { type: "STRING", description: "The rule, in one short clause." },
+  },
+  required: ["yours", "better", "why"],
+};
+
+function schemaFor(direction: Direction) {
+  const properties: Record<string, unknown> = {
+    score: { type: "INTEGER", description: "0-100" },
     verdict: { type: "STRING", enum: ["nailed", "close", "partial", "off"] },
     gist: { type: "STRING", description: "One plain sentence: what the passage actually says." },
     captured: {
       type: "ARRAY",
-      description: "Ideas from the passage the learner did convey. Short phrases.",
+      description: "Ideas the learner did convey. Short phrases.",
       items: { type: "STRING" },
     },
     missed: {
       type: "ARRAY",
-      description: "Ideas present in the original that are absent from the translation.",
+      description: "Ideas present in the original that are absent.",
       items: { type: "STRING" },
     },
     wrong: {
       type: "ARRAY",
-      description: "Actual misreadings, not stylistic differences. Empty if there are none.",
-      items: {
-        type: "OBJECT",
-        properties: {
-          yours: { type: "STRING", description: "What the learner wrote." },
-          actually: { type: "STRING", description: "What the original says." },
-          why: { type: "STRING", description: "One short clause on the cause of the slip." },
-        },
-        required: ["yours", "actually", "why"],
-      },
+      description: "Actual misreadings of meaning, not style. Empty if none.",
+      items: WRONG_ITEM,
     },
     vocab: {
       type: "ARRAY",
-      description: "At most 5 words or phrases the learner evidently did not know.",
+      description:
+        direction === "into-target"
+          ? "At most 5 words or phrases worth learning to say this well next time."
+          : "At most 5 words or phrases the learner evidently did not know.",
       items: {
         type: "OBJECT",
         properties: {
-          term: { type: "STRING", description: "The word or phrase as it appears in the passage." },
-          english: { type: "STRING", description: "Its meaning here, a few words." },
-          note: { type: "STRING", description: "Optional: dictionary form, or why it is tricky." },
+          term: { type: "STRING" },
+          english: { type: "STRING" },
+          note: { type: "STRING" },
         },
         required: ["term", "english"],
       },
     },
-    reference: {
-      type: "STRING",
-      description: "A faithful, plain-English translation of the whole passage.",
-    },
+    reference: { type: "STRING", description: "A faithful, natural translation of the passage." },
     note: { type: "STRING", description: "One honest sentence to the learner." },
-  },
-  required: ["score", "verdict", "gist", "captured", "missed", "wrong", "vocab", "reference", "note"],
-};
+  };
 
-function system(language: string): string {
+  const required = [
+    "score",
+    "verdict",
+    "gist",
+    "captured",
+    "missed",
+    "wrong",
+    "vocab",
+    "reference",
+    "note",
+  ];
+
+  if (direction === "into-target") {
+    properties.corrections = {
+      type: "ARRAY",
+      description:
+        "Every language error, in order of seriousness: agreement, conjugation, mood, prepositions, word order, invented words. Empty only if the writing is genuinely clean.",
+      items: CORRECTION_ITEM,
+    };
+    required.push("corrections");
+  }
+
+  return { type: "OBJECT", properties, required };
+}
+
+function comprehensionSystem(language: string): string {
   return `You are a patient, exacting reading tutor. Your learner is reading a real book in ${language} and writing out, in English, what they understood. They are not producing a literary translation and they are not being tested on English style. You are measuring one thing: did they actually understand the ${language}?
 
 Grade the ideas, not the words.
@@ -72,8 +106,8 @@ Do NOT deduct for any of this:
 DO deduct for:
 - a whole clause or idea left out
 - a flipped negation, or the wrong person doing the action
-- tense, mood or aspect that changes what happened (a conditional read as a fact, a subjunctive wish read as an event)
-- false friends and look-alike guesses (actual, pretender, sensible, librería, embarazada, éxito...)
+- tense, mood or aspect that changes what happened
+- false friends and look-alike guesses
 - inventing content that is not in the passage
 - a figurative expression read literally, or the reverse
 
@@ -85,7 +119,46 @@ Scoring bands:
 45-74 "partial": the thrust is right but something that matters is missing or garbled.
 0-44 "off": the passage was misread.
 
-Be concrete and brief. Quote the ${language} you are discussing. No vague praise. "captured" and "missed" are short phrases, not sentences. If the learner left the box nearly empty or wrote something unrelated, score it low and say so plainly.`;
+Be concrete and brief. Quote the ${language} you are discussing. No vague praise. If the learner left the box nearly empty or wrote something unrelated, score it low and say so plainly.`;
+}
+
+function productionSystem(language: string): string {
+  return `You are a patient, exacting ${language} tutor. Your learner is a native English speaker learning ${language}. They are given a passage of English from a real book and must write it in ${language}. This is production practice: they are composing in a language they do not yet command.
+
+You are judging two things at once, and you must keep them apart:
+1. MEANING — did everything in the English survive into their ${language}?
+2. LANGUAGE — is the ${language} they wrote actually correct?
+
+A sentence can carry the full meaning and still be full of errors, and it can be flawless ${language} that quietly drops half the passage. Say which is happening.
+
+Do NOT deduct for:
+- simpler constructions than the original, as long as they are correct and carry the sense
+- plainer vocabulary than a native author would choose
+- a different but valid word order
+- splitting one ornate English sentence into two clean ${language} ones
+- regional variation that is genuinely standard somewhere
+
+DO correct, every time, in "corrections":
+- gender and number agreement, including adjectives and past participles
+- verb conjugation, and the wrong tense, aspect or mood — above all a missing subjunctive where the language requires it
+- ser versus estar, por versus para, and the equivalent traps in other languages
+- preposition errors, and verbs that demand a particular preposition
+- pronoun placement, clitics, and missing or spurious personal "a"
+- anglicisms: English idiom translated word for word, false friends, English word order
+- invented words, or a real word that does not mean what they think
+- missing or wrong accents, when they change the word or the tense
+
+Correct by changing as little as possible — do not rewrite their sentence into yours. Quote their exact phrase in "yours". If a phrase is correct but a native would never say it, you may note it, but mark clearly that it is naturalness rather than error.
+
+Scoring bands — meaning first, then how much the errors cost:
+95-100 "nailed": the whole meaning, in ${language} that is correct and idiomatic. A stray accent does not stop a 95.
+75-94 "close": meaning intact and the ${language} is understandable throughout; a handful of real errors that a native would notice but not stumble over.
+45-74 "partial": something meaningful was lost or the errors are dense enough to slow a reader down, including errors that change who did what.
+0-44 "off": the meaning did not survive, or the ${language} is too broken to follow, or they answered in English.
+
+If they wrote in English instead of ${language}, score it 0-10 and say what the exercise is.
+
+Be specific and brief. Never offer vague praise. The learner wants to be corrected.`;
 }
 
 export async function POST(request: Request) {
@@ -94,6 +167,7 @@ export async function POST(request: Request) {
       source?: string;
       userText?: string;
       lang?: string;
+      direction?: Direction;
       model?: string;
       title?: string;
       author?: string;
@@ -104,30 +178,35 @@ export async function POST(request: Request) {
     const source = body.source?.trim();
     const userText = body.userText?.trim();
     if (!source) return NextResponse.json({ error: "No passage to grade." }, { status: 400 });
-    if (!userText) return NextResponse.json({ error: "No translation to grade." }, { status: 400 });
+    if (!userText) return NextResponse.json({ error: "Nothing to grade." }, { status: 400 });
 
+    const direction: Direction = body.direction === "into-target" ? "into-target" : "into-english";
     const language = langName(body.lang ?? "es");
-    const parts = [
-      `BOOK: ${body.title ?? "unknown"}${body.author ? ` — ${body.author}` : ""}`,
-    ];
+    const producing = direction === "into-target";
+
+    const parts = [`BOOK: ${body.title ?? "unknown"}${body.author ? ` — ${body.author}` : ""}`];
     if (body.previous) {
-      parts.push(
-        `WHAT CAME JUST BEFORE (context only — do not grade this part):\n"""\n${body.previous}\n"""`,
-      );
+      parts.push(`WHAT CAME JUST BEFORE (context only — do not grade this):\n"""\n${body.previous}\n"""`);
     }
-    parts.push(`PASSAGE IN ${language.toUpperCase()}:\n"""\n${source}\n"""`);
-    parts.push(`WHAT THE LEARNER UNDERSTOOD, IN ENGLISH:\n"""\n${userText}\n"""`);
+    parts.push(
+      producing
+        ? `ENGLISH PASSAGE THE LEARNER MUST RENDER IN ${language.toUpperCase()}:\n"""\n${source}\n"""`
+        : `PASSAGE IN ${language.toUpperCase()}:\n"""\n${source}\n"""`,
+    );
+    parts.push(
+      producing
+        ? `THE LEARNER'S ${language.toUpperCase()}:\n"""\n${userText}\n"""`
+        : `WHAT THE LEARNER UNDERSTOOD, IN ENGLISH:\n"""\n${userText}\n"""`,
+    );
     if (body.hintsUsed) {
-      parts.push(
-        `The learner used ${body.hintsUsed} hint(s) before answering. Mention it only if it matters.`,
-      );
+      parts.push(`The learner used ${body.hintsUsed} hint(s). Mention it only if it matters.`);
     }
 
     const grade = await askJson<Grade>({
       model: body.model,
-      system: system(language),
+      system: producing ? productionSystem(language) : comprehensionSystem(language),
       prompt: parts.join("\n\n"),
-      schema: SCHEMA,
+      schema: schemaFor(direction),
       temperature: 0.15,
     });
 
@@ -136,6 +215,7 @@ export async function POST(request: Request) {
     grade.missed ??= [];
     grade.wrong ??= [];
     grade.vocab ??= [];
+    if (producing) grade.corrections ??= [];
 
     return NextResponse.json(grade);
   } catch (error) {

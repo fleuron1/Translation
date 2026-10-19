@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Feedback from "./Feedback";
 import WordText from "./WordText";
+import { langName } from "@/lib/types";
 import type { Book, Gloss, Grade, Progress, Settings } from "@/lib/types";
 
 type HintCard = { level: number; text: string; kind: string };
@@ -17,7 +18,10 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-const HINT_LABELS = ["Nudge me", "A vaguer idea is fine", "Just the hard words"];
+const HINT_LABELS = {
+  "into-english": ["Nudge me", "A vaguer idea is fine", "Just the hard words"],
+  "into-target": ["Nudge me", "Which grammar is this?", "Just the words I need"],
+};
 
 export default function Reader({
   book,
@@ -32,6 +36,8 @@ export default function Reader({
   const passage = book.passages[index];
   const previous = index > 0 ? book.passages[index - 1] : null;
   const existing = progress.attempts[index];
+  const producing = (book.direction ?? "into-english") === "into-target";
+  const target = langName(book.lang);
 
   const [draft, setDraft] = useState("");
   const [hints, setHints] = useState<HintCard[]>([]);
@@ -89,6 +95,7 @@ export default function Reader({
           source: passage,
           userText: draft,
           lang: book.lang,
+          direction: book.direction ?? "into-english",
           model: settings.model,
           title: book.title,
           author: book.author,
@@ -132,7 +139,13 @@ export default function Reader({
       const response = await fetch("/api/hint", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ source: passage, lang: book.lang, level, model: settings.model }),
+        body: JSON.stringify({
+          source: passage,
+          lang: book.lang,
+          level,
+          model: settings.model,
+          direction: book.direction ?? "into-english",
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not get a hint.");
@@ -152,7 +165,13 @@ export default function Reader({
       const response = await fetch("/api/hint", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ source: passage, lang: book.lang, level: 3, model: settings.model }),
+        body: JSON.stringify({
+          source: passage,
+          lang: book.lang,
+          level: 3,
+          model: settings.model,
+          direction: book.direction ?? "into-english",
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Could not fetch the translation.");
@@ -254,9 +273,14 @@ export default function Reader({
           text={passage}
           lang={book.lang}
           model={settings.model}
+          direction={book.direction ?? "into-english"}
           onSaveWord={saveGlossWord}
         />
-        <p className="mt-3 text-xs text-faint">Click any word for a gloss.</p>
+        <p className="mt-3 text-xs text-faint">
+          {producing
+            ? `Click any word to see how to say it in ${target}.`
+            : "Click any word for a gloss."}
+        </p>
       </section>
 
       {hints.length > 0 && (
@@ -275,10 +299,12 @@ export default function Reader({
 
       <section className="mt-5">
         <label htmlFor="answer" className="text-sm font-medium">
-          What does it say?
+          {producing ? `Write it in ${target}` : "What does it say?"}
         </label>
         <p className="mb-2 text-xs text-muted">
-          Your own words are fine. Say the ideas; nobody is grading your prose.
+          {producing
+            ? `Simple and correct beats ambitious and wrong. Both the meaning and your ${target} are marked.`
+            : "Your own words are fine. Say the ideas; nobody is grading your prose."}
         </p>
         <textarea
           id="answer"
@@ -288,7 +314,11 @@ export default function Reader({
           onKeyDown={onKeyDown}
           rows={5}
           spellCheck
-          placeholder="He is making an excuse, and it is obviously not the real reason…"
+          placeholder={
+            producing
+              ? `Write the passage in ${target}…`
+              : "He is making an excuse, and it is obviously not the real reason…"
+          }
           className="w-full resize-y rounded-lg border border-rule bg-card p-3 text-base leading-relaxed"
         />
       </section>
@@ -306,7 +336,11 @@ export default function Reader({
               disabled={!draft.trim() || busy !== null}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-paper disabled:opacity-40"
             >
-              {busy === "grading" ? "reading yours…" : "Check my understanding"}
+              {busy === "grading"
+                ? "reading yours…"
+                : producing
+                  ? `Check my ${target}`
+                  : "Check my understanding"}
             </button>
             <button
               type="button"
@@ -318,7 +352,7 @@ export default function Reader({
                 ? "thinking…"
                 : hints.length >= 3
                   ? "no hints left"
-                  : HINT_LABELS[hints.length]}
+                  : HINT_LABELS[producing ? "into-target" : "into-english"][hints.length]}
             </button>
             <button
               type="button"

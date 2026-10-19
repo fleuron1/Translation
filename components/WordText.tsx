@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Gloss } from "@/lib/types";
+import type { Direction, Gloss } from "@/lib/types";
 
 const TOKENS = /([\p{L}\p{M}’'-]+)/u;
 const WORD = /^[\p{L}\p{M}’'-]+$/u;
@@ -10,6 +10,7 @@ type Props = {
   text: string;
   lang: string;
   model: string;
+  direction?: Direction;
   onSaveWord?: (gloss: Gloss) => void;
 };
 
@@ -19,7 +20,7 @@ type Open = { term: string; x: number; y: number };
  * The passage itself. Every word is clickable for a one-word gloss — enough to
  * get unstuck without being handed the sentence.
  */
-export default function WordText({ text, lang, model, onSaveWord }: Props) {
+export default function WordText({ text, lang, model, direction, onSaveWord }: Props) {
   const [open, setOpen] = useState<Open | null>(null);
   const [gloss, setGloss] = useState<Gloss | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export default function WordText({ text, lang, model, onSaveWord }: Props) {
         const response = await fetch("/api/gloss", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ term, context: text, lang, model }),
+          body: JSON.stringify({ term, context: text, lang, model, direction }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Lookup failed.");
@@ -58,7 +59,7 @@ export default function WordText({ text, lang, model, onSaveWord }: Props) {
         setLoading(false);
       }
     },
-    [lang, model, text],
+    [lang, model, text, direction],
   );
 
   return (

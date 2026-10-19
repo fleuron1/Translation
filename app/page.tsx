@@ -235,6 +235,7 @@ export default function Home() {
           shelf={shelf.map((book) => ({ book, progress: progressById[book.id] }))}
           wordCount={vocab.length}
           remoteBooks={remoteBooks}
+          onChangeSettings={changeSettings}
           onRebuildRemote={rebuildRemote}
           onOpen={openBook}
           onAdd={addBook}
