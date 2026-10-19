@@ -14,21 +14,91 @@ const STORES = { books: "id", progress: "bookId", vocab: "key", glossary: "key" 
 
 type StoreName = keyof typeof STORES;
 
+export class StorageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageError";
+  }
+}
+
 let connection: Promise<IDBDatabase> | null = null;
 
+/** Nothing here may hang: a pending promise would leave the app loading forever. */
 function open(): Promise<IDBDatabase> {
   if (connection) return connection;
-  connection = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+  connection = new Promise<IDBDatabase>((resolve, reject) => {
+    let settled = false;
+    const once = (act: () => void) => {
+      if (settled) return;
+      settled = true;
+      act();
+    };
+
+    let request: IDBOpenDBRequest;
+    try {
+      request = indexedDB.open(DB_NAME, DB_VERSION);
+    } catch {
+      reject(new StorageError("This browser will not allow local storage, so your shelf cannot be opened."));
+      return;
+    }
+
+    // Raising the version waits for every other connection to close. Another
+    // tab on the old version blocks it, and without this handler the request
+    // never fires at all and the app waits for it forever.
+    request.onblocked = () =>
+      once(() =>
+        reject(
+          new StorageError(
+            "Another tab has this app open on an older version. Close the other tabs and reload.",
+          ),
+        ),
+      );
+
+    // The backstop that actually matters. A blocked upgrade does not always
+    // raise "blocked" — when another version request is already outstanding it
+    // simply queues, and the request never fires at all. Opening a database
+    // takes milliseconds, so anything approaching this long is a hang.
+    const timer = setTimeout(
+      () =>
+        once(() =>
+          reject(
+            new StorageError(
+              "Your shelf would not open. This usually means another tab has the app open — close the others and reload.",
+            ),
+          ),
+        ),
+      5000,
+    );
+
     request.onupgradeneeded = () => {
       const db = request.result;
       for (const [name, keyPath] of Object.entries(STORES)) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+
+    request.onsuccess = () => {
+      clearTimeout(timer);
+      const db = request.result;
+      // If a newer tab needs to upgrade, step aside rather than blocking it.
+      db.onversionchange = () => {
+        db.close();
+        connection = null;
+      };
+      once(() => resolve(db));
+    };
+
+    request.onerror = () => {
+      clearTimeout(timer);
+      once(() => reject(request.error ?? new StorageError("Could not open local storage.")));
+    };
+  }).catch((error) => {
+    // Never cache a failure: a reload, or closing the other tab, should work.
+    connection = null;
+    throw error;
   });
+
   return connection;
 }
 

@@ -34,6 +34,7 @@ export default function Home() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   /** Books the server knows about that this device has not built yet. */
   const [remoteBooks, setRemoteBooks] = useState<RemoteBook[]>([]);
+  const [storageError, setStorageError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const [allBooks, allProgress, allVocab] = await Promise.all([
@@ -50,16 +51,30 @@ export default function Home() {
     setSettings(loadSettings());
     const stopSync = startSync();
 
-    // Local data first so the shelf paints immediately, then fold in the
-    // server's copy and repaint. Reading never waits on the network.
-    refresh()
-      .then(() => setReady(true))
-      .then(() => pull())
-      .then(async (elsewhere) => {
+    void (async () => {
+      // Local data first so the shelf paints immediately, then fold in the
+      // server's copy and repaint. Reading never waits on the network.
+      //
+      // The shelf is shown whatever happens here: a storage failure is
+      // reported in place, never left as a loading message that never ends.
+      try {
+        await refresh();
+      } catch (error) {
+        setStorageError(
+          error instanceof Error ? error.message : "Could not open your shelf on this device.",
+        );
+      } finally {
+        setReady(true);
+      }
+
+      try {
+        const elsewhere = await pull();
         setRemoteBooks(elsewhere);
         await refresh();
-      })
-      .catch(() => setReady(true));
+      } catch {
+        // Sync is optional; the shelf still works without it.
+      }
+    })();
 
     return stopSync;
   }, [refresh]);
@@ -217,6 +232,21 @@ export default function Home() {
 
   return (
     <main>
+      {storageError && (
+        <div className="mx-auto max-w-3xl px-4 pt-4">
+          <p className="rounded-lg border border-bad/40 bg-bad/5 p-3 text-sm text-bad">
+            {storageError}{" "}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="underline decoration-dotted underline-offset-4"
+            >
+              Reload
+            </button>
+          </p>
+        </div>
+      )}
+
       {view === "read" && currentBook && currentProgress ? (
         <Reader
           book={currentBook}
