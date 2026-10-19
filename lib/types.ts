@@ -31,6 +31,16 @@ export type Attempt = {
   at: number;
 };
 
+export type TrimReport = {
+  /** Passages of English apparatus cut from the front and back. */
+  apparatusBefore: number;
+  apparatusAfter: number;
+  /** Title page, credits, contents, dedication, prologue. */
+  frontMatter: number;
+  /** The heading the book was judged to start at. */
+  startedAt?: string;
+};
+
 export type Book = {
   id: string;
   title: string;
@@ -41,6 +51,8 @@ export type Book = {
   passages: string[];
   chapters: { title: string; index: number }[];
   addedAt: number;
+  /** What was cut when the book was loaded, so the reader can say so. */
+  skipped?: TrimReport;
 };
 
 export type Progress = {

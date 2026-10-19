@@ -66,7 +66,13 @@ The whole personality of the app is the system prompt in `app/api/grade/route.ts
 ## Notes
 
 - **Books.** Public-domain texts from Project Gutenberg, downloaded when you open one. Nothing is bundled with this repo.
-- **Real editions are messy.** Many Gutenberg files wrap the book in an English introduction, endnotes and a glossary. `lib/language.ts` finds the longest run of actual target-language text and trims the rest — on *El sombrero de tres picos* that drops 77 passages of front matter and 920 of editorial apparatus.
+- **Real editions are messy,** and getting you to the first line of the actual book takes two passes.
+
+  `lib/language.ts` handles the English wrapper some foreign-language editions carry — introduction, footnotes, endnotes, glossary — by keeping the longest run of actual target-language text. Annotated editions interleave blocks of English footnotes with the prose, so short interruptions are bridged rather than treated as the end of the book.
+
+  `lib/frontmatter.ts` then handles the book's *own* front matter, which is in the book's own language and so invisible to the first pass: title pages, transcriber's credits, contents, dedications, prologues. It keys off a numbered *series* of headings (I, II, III or Capítulo primero, Capítulo II) rather than any single heading, since a prologue can look like a chapter but never comes as a numbered run. Guards against over-trimming: it will not cut past 35% of the book, it refuses a candidate numbered above one (which means chapter one was missed), and it checks that real prose rather than a contents list follows. When nothing is confident, it cuts nothing.
+
+  Across the seven starter books this lands on the true first line of each. The reader says what it skipped, so a bad call is visible rather than silent.
 - **Your data is yours.** Books, progress and saved words live in your browser's IndexedDB. The server stores nothing.
 - **PDFs are read locally.** A PDF you open is parsed in the browser and never uploaded — partly for privacy, partly because book PDFs run well past Vercel's 4.5MB request limit. Only the passage being graded leaves the machine.
 - **A PDF has no paragraphs,** only glyphs at coordinates, so `lib/pdf-text.ts` reconstructs them: it strips the running header and page numbers, rejoins words hyphenated across a line break, treats an indent or an opening dash as a new paragraph, and stitches a paragraph back together when it spans a page break. A scanned PDF with no text layer is detected and rejected with a note about OCR, rather than silently yielding nothing.

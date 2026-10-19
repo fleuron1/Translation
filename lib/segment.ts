@@ -1,4 +1,6 @@
 import { findBookSpan } from "./language";
+import { findBodyStart } from "./frontmatter";
+import type { TrimReport } from "./types";
 
 /**
  * Turns a raw public-domain book file into translation-sized passages.
@@ -11,13 +13,15 @@ import { findBookSpan } from "./language";
 export type Segmented = {
   passages: string[];
   chapters: { title: string; index: number }[];
-  trimmed: { leading: number; trailing: number } | null;
+  trimmed: TrimReport | null;
 };
 
 export type SegmentOptions = {
   lang?: string;
   /** Pasted text is taken as-is; downloaded files get their apparatus trimmed. */
   trimApparatus?: boolean;
+  /** Skip the title page, credits, contents and prologue. */
+  trimFrontMatter?: boolean;
 };
 
 const ABBREV =
@@ -167,27 +171,45 @@ export function segment(
   }
   flush();
 
-  if (options.trimApparatus === false || !options.lang) {
-    return { passages, chapters: clampChapters(chapters, passages.length), trimmed: null };
+  let kept = passages;
+  let keptChapters = chapters;
+  const report: TrimReport = { apparatusBefore: 0, apparatusAfter: 0, frontMatter: 0 };
+
+  // Slices the passages and rebases the chapter indices onto what is left.
+  const cut = (start: number, end: number) => {
+    keptChapters = keptChapters
+      .filter((c) => c.index >= start && c.index <= end)
+      .map((c) => ({ title: c.title, index: c.index - start }));
+    kept = kept.slice(start, end + 1);
+  };
+
+  // First the English wrapper some editions put around a foreign text...
+  if (options.trimApparatus !== false && options.lang) {
+    const span = findBookSpan(kept, options.lang);
+    if (span) {
+      report.apparatusBefore = span.start;
+      report.apparatusAfter = kept.length - 1 - span.end;
+      cut(span.start, span.end);
+    }
   }
 
-  const span = findBookSpan(passages, options.lang);
-  if (!span) {
-    return { passages, chapters: clampChapters(chapters, passages.length), trimmed: null };
+  // ...then the book's own front matter, which is in the book's own language.
+  if (options.trimFrontMatter) {
+    const body = findBodyStart(kept, keptChapters);
+    if (body && body.index > 0) {
+      report.frontMatter = body.index;
+      report.startedAt = body.startedAt;
+      cut(body.index, kept.length - 1);
+    }
   }
 
-  const kept = passages.slice(span.start, span.end + 1);
-  const rebased = chapters
-    .filter((c) => c.index >= span.start && c.index <= span.end)
-    .map((c) => ({ title: c.title, index: c.index - span.start }));
+  const trimmedAnything =
+    report.apparatusBefore > 0 || report.apparatusAfter > 0 || report.frontMatter > 0;
 
   return {
     passages: kept,
-    chapters: clampChapters(rebased, kept.length),
-    trimmed: {
-      leading: span.start,
-      trailing: passages.length - 1 - span.end,
-    },
+    chapters: clampChapters(keptChapters, kept.length),
+    trimmed: trimmedAnything ? report : null,
   };
 }
 

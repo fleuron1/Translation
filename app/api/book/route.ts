@@ -31,6 +31,7 @@ export async function POST(request: Request) {
       const { passages, chapters, trimmed } = segment(stripBoilerplate(raw), maxChars, {
         lang,
         trimApparatus: true,
+        trimFrontMatter: true,
       });
 
       if (!passages.length) {
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
         passages,
         chapters,
         addedAt: Date.now(),
+        skipped: trimmed ?? undefined,
       };
       return NextResponse.json({ book, detectedLanguage: header.language ?? null, trimmed });
     }

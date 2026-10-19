@@ -64,9 +64,10 @@ export default function PdfImport({ settings, onAdd }: Props) {
       });
 
       // Segmenting here as well keeps the whole file on this machine.
-      const { passages, chapters } = segment(extraction.text, settings.maxChars, {
+      const { passages, chapters, trimmed } = segment(extraction.text, settings.maxChars, {
         lang: settings.lang,
         trimApparatus: false,
+        trimFrontMatter: true,
       });
 
       if (!passages.length) {
@@ -82,6 +83,7 @@ export default function PdfImport({ settings, onAdd }: Props) {
         passages,
         chapters,
         addedAt: Date.now(),
+        skipped: trimmed ?? undefined,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read that PDF.");

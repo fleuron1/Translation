@@ -110,7 +110,28 @@ export function findBookSpan(
   }
   if (start !== -1) runs.push({ start, end: lastTarget, count });
 
-  const best = runs.sort((a, b) => b.count - a.count)[0];
+  // An annotated edition drops blocks of English footnotes into the middle of
+  // the text, splitting one body into several runs. Rejoin neighbours when the
+  // English between them is small next to the runs it separates — otherwise
+  // the longest-run rule keeps only the stretch after the last footnote.
+  const merged: { start: number; end: number; count: number }[] = [];
+  for (const run of runs) {
+    const previous = merged[merged.length - 1];
+    if (previous) {
+      let englishBetween = 0;
+      for (let i = previous.end + 1; i < run.start; i++) {
+        if (verdicts[i] === "english") englishBetween++;
+      }
+      if (englishBetween <= Math.max(maxGap, 0.2 * Math.min(previous.count, run.count))) {
+        previous.end = run.end;
+        previous.count += run.count;
+        continue;
+      }
+    }
+    merged.push({ ...run });
+  }
+
+  const best = merged.sort((a, b) => b.count - a.count)[0];
   if (!best) return null;
   if (best.count < 15 || best.count < passages.length * 0.15) return null;
   if (best.start === 0 && best.end === passages.length - 1) return null;

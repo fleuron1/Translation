@@ -208,6 +208,14 @@ export default function Reader({
         />
       </div>
 
+      {index === 0 && (book.skipped?.frontMatter ?? 0) > 0 && (
+        <p className="mb-4 rounded-lg border border-rule bg-card/60 p-3 text-xs text-muted">
+          Started you at{" "}
+          <span className="text-ink">{book.skipped?.startedAt ?? "the first chapter"}</span>, past{" "}
+          {book.skipped?.frontMatter} passages of title page, credits and prologue.
+        </p>
+      )}
+
       {previous && settings.showContext && (
         <div className="mb-4">
           {showPrevious ? (
