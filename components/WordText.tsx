@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { cached, lookup, remember } from "@/lib/glossary";
 import type { Direction, Gloss } from "@/lib/types";
 
 const TOKENS = /([\p{L}\p{M}’'-]+)/u;
@@ -17,8 +18,12 @@ type Props = {
 type Open = { term: string; x: number; y: number };
 
 /**
- * The passage itself. Every word is clickable for a one-word gloss — enough to
- * get unstuck without being handed the sentence.
+ * The passage itself. Every word is clickable for a gloss — enough to get
+ * unstuck without being handed the sentence.
+ *
+ * The passage is swept in the background when it loads, so a click is
+ * normally answered from memory with no request at all; the single-word
+ * lookup below is only the fallback for whatever the sweep missed.
  */
 export default function WordText({ text, lang, model, direction, onSaveWord }: Props) {
   const [open, setOpen] = useState<Open | null>(null);
@@ -26,7 +31,8 @@ export default function WordText({ text, lang, model, direction, onSaveWord }: P
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
-  const cache = useRef(new Map<string, Gloss>());
+
+  const way: Direction = direction ?? "into-english";
 
   const lookUp = useCallback(
     async (term: string, element: HTMLElement) => {
@@ -35,31 +41,39 @@ export default function WordText({ text, lang, model, direction, onSaveWord }: P
       setError(null);
       setSaved(false);
 
-      const cached = cache.current.get(term.toLowerCase());
-      if (cached) {
-        setGloss(cached);
+      // In memory already: no spinner, no request, no flicker.
+      const instant = cached(lang, way, term);
+      if (instant) {
+        setGloss(instant as Gloss);
         return;
       }
 
       setGloss(null);
       setLoading(true);
       try {
+        const stored = await lookup(lang, way, term);
+        if (stored) {
+          setGloss(stored as Gloss);
+          return;
+        }
+
         const response = await fetch("/api/gloss", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ term, context: text, lang, model, direction }),
+          body: JSON.stringify({ term, context: text, lang, model, direction: way }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Lookup failed.");
-        cache.current.set(term.toLowerCase(), data as Gloss);
+
         setGloss(data as Gloss);
+        await remember(lang, way, [data as Gloss]);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Lookup failed.");
       } finally {
         setLoading(false);
       }
     },
-    [lang, model, text, direction],
+    [lang, model, text, way],
   );
 
   return (

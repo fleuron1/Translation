@@ -1,6 +1,6 @@
 "use client";
 
-import type { Book, Progress, VocabEntry } from "./types";
+import type { Book, GlossEntry, Progress, VocabEntry } from "./types";
 
 /**
  * Books run to megabytes, which is too much for localStorage, so everything
@@ -9,8 +9,8 @@ import type { Book, Progress, VocabEntry } from "./types";
  */
 
 const DB_NAME = "gist";
-const DB_VERSION = 1;
-const STORES = { books: "id", progress: "bookId", vocab: "key" } as const;
+const DB_VERSION = 2;
+const STORES = { books: "id", progress: "bookId", vocab: "key", glossary: "key" } as const;
 
 type StoreName = keyof typeof STORES;
 
@@ -67,6 +67,12 @@ export const vocab = {
   get: (key: string) => run<VocabEntry | undefined>("vocab", "readonly", (s) => s.get(key)),
   put: (entry: VocabEntry) => run<IDBValidKey>("vocab", "readwrite", (s) => s.put(entry)),
   remove: (key: string) => run<undefined>("vocab", "readwrite", (s) => s.delete(key)),
+};
+
+export const glossary = {
+  get: (key: string) => run<GlossEntry | undefined>("glossary", "readonly", (s) => s.get(key)),
+  put: (entry: GlossEntry) => run<IDBValidKey>("glossary", "readwrite", (s) => s.put(entry)),
+  all: () => run<GlossEntry[]>("glossary", "readonly", (s) => s.getAll()),
 };
 
 /** Collapses a term to a stable key so the same word is not saved twice. */

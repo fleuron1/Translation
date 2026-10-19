@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Feedback from "./Feedback";
 import WordText from "./WordText";
+import { prefetch } from "@/lib/glossary";
 import { langName } from "@/lib/types";
 import type { Book, Gloss, Grade, Progress, Settings } from "@/lib/types";
 
@@ -58,6 +59,22 @@ export default function Reader({
     setError(null);
     setShowPrevious(false);
   }, [index, book.id, progress.attempts]);
+
+  // Gloss the whole passage in the background the moment it appears, so a
+  // click on any word is answered from memory. The next passage is swept
+  // after it, which makes moving on instant too.
+  useEffect(() => {
+    if (!passage) return;
+    const way = book.direction ?? "into-english";
+    let live = true;
+    void prefetch(passage, book.lang, way, settings.model).then(() => {
+      const next = book.passages[index + 1];
+      if (live && next) void prefetch(next, book.lang, way, settings.model);
+    });
+    return () => {
+      live = false;
+    };
+  }, [passage, index, book.lang, book.direction, book.passages, settings.model]);
 
   const stats = useMemo(() => {
     const attempts = Object.values(progress.attempts);

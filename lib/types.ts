@@ -32,6 +32,17 @@ export type Gloss = {
   note?: string;
 };
 
+/** A cached word gloss, so the same word is never looked up twice. */
+export type GlossEntry = {
+  key: string;
+  term: string;
+  lemma: string;
+  pos: string;
+  here: string;
+  note?: string;
+  at: number;
+};
+
 export type Attempt = {
   index: number;
   /** Hash of the passage this graded, so it survives re-segmentation. */
