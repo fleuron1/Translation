@@ -43,6 +43,29 @@ const keyFor = (lang: string, direction: Direction, source: string, clause: stri
 const TYPOGRAPHY =
   "w-full rounded-lg border p-3 text-base leading-relaxed whitespace-pre-wrap break-words";
 
+/**
+ * Dead-key accents, the way word processors have always done them: a
+ * modifier chord arms an accent, and the next letter wears it. Typing
+ * Spanish on a keyboard that has no á should not mean hunting for a
+ * character map.
+ */
+type Dead = "acute" | "tilde" | "diaeresis";
+
+const ACCENTS: Record<Dead, Record<string, string>> = {
+  acute: {
+    a: "á", e: "é", i: "í", o: "ó", u: "ú", y: "ý",
+    A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú", Y: "Ý",
+  },
+  tilde: { n: "ñ", a: "ã", o: "õ", N: "Ñ", A: "Ã", O: "Õ" },
+  diaeresis: { u: "ü", i: "ï", e: "ë", a: "ä", o: "ö", U: "Ü", I: "Ï", E: "Ë", A: "Ä", O: "Ö" },
+};
+
+const DEAD_LABEL: Record<Dead, string> = {
+  acute: "´ accent — press a vowel",
+  tilde: "~ tilde — press n",
+  diaeresis: "¨ diaeresis — press u",
+};
+
 const LOOK = {
   bad: "underline decoration-wavy decoration-2 underline-offset-4 decoration-[var(--bad)] bg-bad/10 rounded-sm",
   warn: "underline decoration-wavy decoration-2 underline-offset-4 decoration-[var(--warn)] bg-warn/10 rounded-sm",
@@ -108,6 +131,80 @@ export default function AnswerEditor({
   const [busy, setBusy] = useState(false);
   const [hover, setHover] = useState<{ mark: Mark; x: number; y: number } | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
+  const [dead, setDead] = useState<Dead | null>(null);
+  const caret = useRef<number | null>(null);
+
+  // The value is controlled, so the caret has to be put back by hand after an
+  // accent is inserted; otherwise React's re-render drops it to the end.
+  useEffect(() => {
+    if (caret.current === null || !box.current) return;
+    const at = caret.current;
+    caret.current = null;
+    box.current.setSelectionRange(at, at);
+  }, [value]);
+
+  function insert(char: string) {
+    const field = box.current;
+    if (!field) return;
+    const from = field.selectionStart ?? value.length;
+    const to = field.selectionEnd ?? from;
+    caret.current = from + char.length;
+    onChange(value.slice(0, from) + char + value.slice(to));
+  }
+
+  function keyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // An armed accent claims the next letter.
+    if (dead) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDead(null);
+        return;
+      }
+      const composed = ACCENTS[dead][event.key];
+      if (composed) {
+        event.preventDefault();
+        setDead(null);
+        insert(composed);
+        return;
+      }
+      // Anything else: forget the accent and let the key through normally.
+      if (event.key.length === 1) setDead(null);
+    }
+
+    const chord = event.ctrlKey || event.metaKey;
+    if (chord && !event.altKey) {
+      if (event.key === "'") {
+        event.preventDefault();
+        setDead("acute");
+        return;
+      }
+      if (event.key === "~") {
+        event.preventDefault();
+        setDead("tilde");
+        return;
+      }
+      if (event.key === ":") {
+        event.preventDefault();
+        setDead("diaeresis");
+        return;
+      }
+    }
+    // The inverted marks Spanish opens questions and exclamations with.
+    if (chord && event.altKey) {
+      if (event.key === "?" || event.key === "/") {
+        event.preventDefault();
+        insert("¿");
+        return;
+      }
+      if (event.key === "!" || event.key === "1") {
+        event.preventDefault();
+        insert("¡");
+        return;
+      }
+    }
+
+    onKeyDown?.(event);
+  }
 
   const refresh = useCallback(() => {
     setMarks(enabled ? marksFor(value, source, lang, direction) : []);
@@ -216,7 +313,8 @@ export default function AnswerEditor({
         ref={box}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        onKeyDown={onKeyDown}
+        onKeyDown={keyDown}
+        onBlur={() => setDead(null)}
         onScroll={(event) => {
           if (!mirror.current) return;
           mirror.current.scrollTop = event.currentTarget.scrollTop;
@@ -241,17 +339,23 @@ export default function AnswerEditor({
         className={`${TYPOGRAPHY} relative resize-y border-transparent bg-transparent text-transparent caret-[var(--ink)] placeholder:text-faint`}
       />
 
-      {enabled && (
-        <p className="mt-1 h-4 text-xs text-faint">
-          {busy
-            ? "checking…"
-            : marks.length > 0
-              ? `${marks.length} to look at — hover one, or tap it`
-              : value.trim()
-                ? "nothing wrong so far"
-                : ""}
-        </p>
-      )}
+      <p className="mt-1 h-4 text-xs">
+        {dead ? (
+          <span className="font-medium text-accent">{DEAD_LABEL[dead]}</span>
+        ) : (
+          <span className="text-faint">
+            {!enabled
+              ? ""
+              : busy
+                ? "checking…"
+                : marks.length > 0
+                  ? `${marks.length} to look at — hover one, or tap it`
+                  : value.trim()
+                    ? "nothing wrong so far"
+                    : ""}
+          </span>
+        )}
+      </p>
 
       {shown?.mark && (
         <div

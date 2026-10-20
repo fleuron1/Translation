@@ -328,9 +328,18 @@ export default function Reader({
           {producing ? `Write it in ${target}` : "What does it say?"}
         </label>
         <p className="mb-2 text-xs text-muted">
-          {producing
-            ? `Simple and correct beats ambitious and wrong. Both the meaning and your ${target} are marked.`
-            : "Your own words are fine. Say the ideas; nobody is grading your prose."}
+          {producing ? (
+            <>
+              Simple and correct beats ambitious and wrong. Both the meaning and your {target} are
+              marked.{" "}
+              <span className="text-faint">
+                Accents: Ctrl + &apos; then a vowel. Ctrl + ~ then n for ñ. Ctrl + Alt + ? and ! for
+                ¿ and ¡.
+              </span>
+            </>
+          ) : (
+            "Your own words are fine. Say the ideas; nobody is grading your prose."
+          )}
         </p>
         <AnswerEditor
           value={draft}
