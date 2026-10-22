@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ComposeText from "./ComposeText";
 import PdfImport from "./PdfImport";
 import type { RemoteBook } from "@/lib/sync";
 import { LEVEL_LABEL, STARTERS } from "@/lib/starters";
@@ -432,6 +433,10 @@ export default function Library({
 
           <div className="mt-3 border-t border-rule pt-3">
             <PdfImport settings={settings} onAdd={onAdd} />
+          </div>
+
+          <div className="mt-3 border-t border-rule pt-3">
+            <ComposeText settings={settings} onAdd={onAdd} />
           </div>
         </div>
       </section>
