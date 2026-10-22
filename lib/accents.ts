@@ -116,6 +116,7 @@ const SCHEMES: Record<string, Scheme> = {
   sv: { dead: ["ring", "diaeresis"] },
   eo: { dead: ["circumflex", "breve"] },
   ca: { dead: ["acute", "grave", "diaeresis", "cedilla"], direct: { ".": "·" } },
+  ga: { dead: ["acute"] },
   da: { dead: ["ring", "stroke"], direct: { e: "æ" } },
   nb: { dead: ["ring", "stroke"], direct: { e: "æ" } },
 };
@@ -135,6 +136,7 @@ const SAMPLE: Record<string, Partial<Record<Dead, string>>> = {
   hu: { diaeresis: "ö", doubleacute: "ő" },
   sv: { diaeresis: "ö" },
   eo: { circumflex: "ĉ" },
+  ga: { acute: "á" },
   ca: { diaeresis: "ï", acute: "é" },
 };
 

@@ -157,6 +157,7 @@ export const LANGUAGES: { code: string; name: string; gutenberg: string }[] = [
   { code: "sv", name: "Swedish", gutenberg: "sv" },
   { code: "la", name: "Latin", gutenberg: "la" },
   { code: "eo", name: "Esperanto", gutenberg: "eo" },
+  { code: "ga", name: "Irish", gutenberg: "ga" },
   { code: "ca", name: "Catalan", gutenberg: "ca" },
   { code: "da", name: "Danish", gutenberg: "da" },
 ];

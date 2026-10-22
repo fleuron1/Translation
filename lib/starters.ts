@@ -931,6 +931,65 @@ export const STARTERS: Starter[] = [
     level: "steep",
     blurb: "The great modernist novel, but dense imagery and unquoted dialogue make it slow going.",
   },
+
+  // --- Irish ---
+  // Six of the seven Irish titles on Gutenberg. The seventh is a parallel
+  // English edition, which the apparatus trimmer reads as a book wrapped in
+  // English and cuts into.
+  {
+    gutenbergId: 16122,
+    title: "Leabhráin an Irisleabhair—III",
+    author: "Chonán Maol",
+    lang: "ga",
+    direction: "into-english",
+    level: "gentle",
+    blurb: "Short magazine pieces, a few pages each — the gentlest way in, and you can stop after one.",
+  },
+  {
+    gutenbergId: 79587,
+    title: "Cormac Ua Conaill",
+    author: "Patrick S. Dinneen",
+    lang: "ga",
+    direction: "into-english",
+    level: "moderate",
+    blurb: "A short historical novel by the dictionary-maker himself; plain narrative past throughout.",
+  },
+  {
+    gutenbergId: 50913,
+    title: "Niamh",
+    author: "Peter O'Leary",
+    lang: "ga",
+    direction: "into-english",
+    level: "moderate",
+    blurb: "A full novel in Munster Irish by an tAthair Peadar, who wrote deliberately close to speech.",
+  },
+  {
+    gutenbergId: 79830,
+    title: "Prátaí Mhíchíl Thaidhg",
+    author: "Séamus Ó Dubhghaill",
+    lang: "ga",
+    direction: "into-english",
+    level: "moderate",
+    blurb: "Comic country stories, printed in the old overdot spelling where ḃ and ṁ stand for bh and mh.",
+  },
+  {
+    gutenbergId: 78840,
+    title: "Aodh Ó Néill",
+    author: "Pádraig Ó Seaghdha",
+    lang: "ga",
+    direction: "into-english",
+    level: "steep",
+    blurb: "Historical prose in the old overdot spelling, with the vocabulary the subject demands.",
+  },
+  {
+    gutenbergId: 78815,
+    title: "Maidean i mBéarra agus dánta eile",
+    author: "Osborn Bergin",
+    lang: "ga",
+    direction: "into-english",
+    level: "steep",
+    blurb: "Poetry, so the word order bends and the lines are dense. Rewarding, but not a first book.",
+  },
 ];
 
 export const LEVEL_LABEL: Record<Starter["level"], string> = {
