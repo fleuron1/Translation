@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  COMPOSE,
+  MARK_NAME,
+  directFor,
+  markFor,
+  usesInverted,
+  type Dead,
+} from "@/lib/accents";
 import { splitAnswer } from "@/lib/answer";
 import type { Direction } from "@/lib/types";
 
@@ -42,29 +50,6 @@ const keyFor = (lang: string, direction: Direction, source: string, clause: stri
  */
 const TYPOGRAPHY =
   "w-full rounded-lg border p-3 text-base leading-relaxed whitespace-pre-wrap break-words";
-
-/**
- * Dead-key accents, the way word processors have always done them: a
- * modifier chord arms an accent, and the next letter wears it. Typing
- * Spanish on a keyboard that has no á should not mean hunting for a
- * character map.
- */
-type Dead = "acute" | "tilde" | "diaeresis";
-
-const ACCENTS: Record<Dead, Record<string, string>> = {
-  acute: {
-    a: "á", e: "é", i: "í", o: "ó", u: "ú", y: "ý",
-    A: "Á", E: "É", I: "Í", O: "Ó", U: "Ú", Y: "Ý",
-  },
-  tilde: { n: "ñ", a: "ã", o: "õ", N: "Ñ", A: "Ã", O: "Õ" },
-  diaeresis: { u: "ü", i: "ï", e: "ë", a: "ä", o: "ö", U: "Ü", I: "Ï", E: "Ë", A: "Ä", O: "Ö" },
-};
-
-const DEAD_LABEL: Record<Dead, string> = {
-  acute: "´ accent — press a vowel",
-  tilde: "~ tilde — press n",
-  diaeresis: "¨ diaeresis — press u",
-};
 
 const LOOK = {
   bad: "underline decoration-wavy decoration-2 underline-offset-4 decoration-[var(--bad)] bg-bad/10 rounded-sm",
@@ -134,6 +119,9 @@ export default function AnswerEditor({
   const [dead, setDead] = useState<Dead | null>(null);
   const caret = useRef<number | null>(null);
 
+  /** Accents matter only in the direction where the learner writes the language. */
+  const typing = direction === "into-target";
+
   // The value is controlled, so the caret has to be put back by hand after an
   // accent is inserted; otherwise React's re-render drops it to the end.
   useEffect(() => {
@@ -160,7 +148,7 @@ export default function AnswerEditor({
         setDead(null);
         return;
       }
-      const composed = ACCENTS[dead][event.key];
+      const composed = COMPOSE[dead][event.key];
       if (composed) {
         event.preventDefault();
         setDead(null);
@@ -171,26 +159,25 @@ export default function AnswerEditor({
       if (event.key.length === 1) setDead(null);
     }
 
+    // Only when the learner is actually writing the language: reading it and
+    // answering in English needs no accents, and arming one would be noise.
     const chord = event.ctrlKey || event.metaKey;
-    if (chord && !event.altKey) {
-      if (event.key === "'") {
+    if (typing && chord && !event.altKey) {
+      const mark = markFor(lang, event.key);
+      if (mark) {
         event.preventDefault();
-        setDead("acute");
+        setDead(mark);
         return;
       }
-      if (event.key === "~") {
+      const letter = directFor(lang, event.key);
+      if (letter) {
         event.preventDefault();
-        setDead("tilde");
-        return;
-      }
-      if (event.key === ":") {
-        event.preventDefault();
-        setDead("diaeresis");
+        insert(event.shiftKey ? letter.toUpperCase() : letter);
         return;
       }
     }
     // The inverted marks Spanish opens questions and exclamations with.
-    if (chord && event.altKey) {
+    if (typing && chord && event.altKey && usesInverted(lang)) {
       if (event.key === "?" || event.key === "/") {
         event.preventDefault();
         insert("¿");
@@ -341,7 +328,9 @@ export default function AnswerEditor({
 
       <p className="mt-1 h-4 text-xs">
         {dead ? (
-          <span className="font-medium text-accent">{DEAD_LABEL[dead]}</span>
+          <span className="font-medium text-accent">
+            {MARK_NAME[dead]} — press a letter
+          </span>
         ) : (
           <span className="text-faint">
             {!enabled

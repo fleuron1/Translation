@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { accentHelp } from "@/lib/accents";
 import AnswerEditor from "./AnswerEditor";
 import Feedback from "./Feedback";
 import WordText from "./WordText";
@@ -332,10 +333,9 @@ export default function Reader({
             <>
               Simple and correct beats ambitious and wrong. Both the meaning and your {target} are
               marked.{" "}
-              <span className="text-faint">
-                Accents: Ctrl + &apos; then a vowel. Ctrl + ~ then n for ñ. Ctrl + Alt + ? and ! for
-                ¿ and ¡.
-              </span>
+              {accentHelp(book.lang) && (
+                <span className="text-faint">{accentHelp(book.lang)}</span>
+              )}
             </>
           ) : (
             "Your own words are fine. Say the ideas; nobody is grading your prose."
