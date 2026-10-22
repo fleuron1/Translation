@@ -264,6 +264,20 @@ export default function Library({
         </section>
       )}
 
+      {starters.length === 0 && (
+        <section className="mb-10 rounded-lg border border-dashed border-rule p-4">
+          <h2 className="mb-2 text-xs font-semibold tracking-wide text-faint uppercase">
+            No shelf for {langName(settings.lang)} yet
+          </h2>
+          <p className="text-sm text-muted">
+            Project Gutenberg is uneven by language — some have thousands of books, some have
+            almost none. Search below in case there is something, or bring your own: open a PDF
+            from your computer, or paste a chapter in. Both work exactly the same way once they
+            are in.
+          </p>
+        </section>
+      )}
+
       {starters.length > 0 && (
         <section className="mb-10">
           <h2 className="mb-3 text-xs font-semibold tracking-wide text-faint uppercase">
