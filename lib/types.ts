@@ -90,7 +90,7 @@ export type Book = {
   title: string;
   author: string;
   lang: string;
-  source: "gutenberg" | "paste" | "pdf" | "generated";
+  source: "gutenberg" | "paste" | "pdf";
   /** Defaults to into-english for books added before reverse mode existed. */
   direction?: Direction;
   gutenbergId?: number;
