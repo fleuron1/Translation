@@ -11,32 +11,95 @@ const ENGLISH = new Set(
 );
 
 const BY_LANG: Record<string, Set<string>> = {
-  es: new Set(
-    "de la que el en y a los se del las un por con no una su para es al lo como más pero sus le ya o este sí porque esta entre cuando muy sin sobre también me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos esto antes algunos qué unos yo otro otras otra él tanto esa estos mucho nada muchos cual poco ella estar había era son fue ser tiene dijo"
+  fr: new Set(
+      "le la les un une des du de au aux ce cette ces mon ma mes son sa ses notre votre leur" +
+      "et ou mais car donc que qui dont où quand comme si ne pas plus ni à dans en par pour" +
+      "sur sous sans avec chez entre après avant je tu il elle on nous vous ils elles me te" +
+      "se lui y moi est sont était été être a ont avait avoir fut"
       .split(" "),
   ),
-  fr: new Set(
-    "le de un à être et en avoir que pour dans ce il qui ne sur se pas plus par je avec tout faire son mettre autre on mais nous comme mon lui nos sans aussi celui donc des les la du au elle ils était est sont été cette ces quelque bien où ou si dont leur vous moi"
+  fi: new Set(
+      "ja on ei oli se hän että kuin mutta niin kun nyt minä sen hänen vaan he joka sitä mitä" +
+      "sitten vielä sinä jo häntä kaikki siitä jos sillä ne en ole siinä siellä silloin eikä" +
+      "aina kuinka olivat ollut olisi tämä heidän mitään taas koska tässä täällä niinkuin" +
+      "juuri minun vaikka kyllä ettei minua hänelle olla tuo siihen olen me mikä kanssa ennen" +
+      "jonka näin kuitenkin niitä sinua ovat itse tämän myös vai jotka tai sekä sinun te et"
       .split(" "),
   ),
   de: new Set(
-    "der die das und in zu den von mit sich des auf für ist im dem nicht ein eine als auch es an werden aus er hat dass sie nach wird bei einer um am sind noch wie einem über so zum war haben nur oder aber vor zur bis mehr durch man sein wenn ihr dann ich wir mich"
-      .split(" "),
-  ),
-  it: new Set(
-    "di che e il la a per un in non una mi è sono le si lo ma ha ti ci come più da se io hai ho questo qui del alla tutto anche al della gli nel con su mio li era quando cosa dei sua suo tu lei noi loro essere fare perché"
-      .split(" "),
-  ),
-  pt: new Set(
-    "de a o que e do da em um para com não uma os no se na por mais as dos como mas ao ele das à seu sua ou quando muito nos já eu também só pelo pela até isso ela entre era depois sem mesmo aos seus quem nas me esse eles está foi são tem"
+      "der die und in den von zu das mit sich des auf für ist im dem nicht ein eine als auch" +
+      "es an werden aus er hat dass sie nach wird bei einer um am sind noch wie einem über so" +
+      "zum war haben nur oder aber vor zur bis durch man sein wenn ihr dann ich wir mich ihm" +
+      "mir du ihn uns ihre einen kann hatte waren schon was wo wurde diese habe denn unter" +
+      "ohne weil ob"
       .split(" "),
   ),
   nl: new Set(
-    "de van het een en in is dat op te zijn met voor niet aan er die ook als maar om door over bij uit nog naar dan of wat heeft werd deze hij zij ze hun was wordt veel heb ik je we men geen zich tot onder tegen waar"
+      "en de het een zij hij van in dat ik niet haar je te was zijn op met den maar die er" +
+      "hem zich had als zoo aan is nu voor toen ze naar dan wat om zou uit nog bij ook door" +
+      "of over toch wel daar al meer u me eens geen hoe mij tot zal mijn waar waren ben werd" +
+      "kon hare hebben dien kan der onder heeft hun toe tegen eene want men dit moet deze"
+      .split(" "),
+  ),
+  it: new Set(
+      "e di che a il la non un in per si le una con ma i da più gli del come era se della è" +
+      "lo al mi alla io o quel quella suo quando anche sua ne ci nel loro perchè perché tutti" +
+      "tutto sono questo delle dei chi lui senza ed vi ad me nella questa ho ha uno dalla" +
+      "ogni fosse quale dal fu quello mio col tu voi nè né cui lei erano noi ti egli"
+      .split(" "),
+  ),
+  pt: new Set(
+      "que de a o e não se um uma do da dos das os as em no na nos ao aos à á com para por" +
+      "pelo pela me lhe te eu tu ele ela elle ella elles mas como mais ou nem quando porque" +
+      "já depois sem ainda tão só também tambem assim este esta esse essa isso isto aquela" +
+      "aquella meu minha seu sua seus muito quem onde até entre é era foi ser tem tinha está" +
+      "havia"
+      .split(" "),
+  ),
+  hu: new Set(
+      "a az és hogy nem is egy volt s de meg csak már én ha azt van még most ki mint ő ez" +
+      "mert el hát e volna itt se pedig mi mikor ott neki úgy sem be mit akkor ne te ezt" +
+      "hanem kell aztán minden valami majd vagy lesz maga fel aki lett mind magát vagyok ugy" +
+      "így igy vissza voltak nekem rá alatt oda le vele után mellett előtt vannak legyen ami" +
+      "között ide nincs kellett lehet"
+      .split(" "),
+  ),
+  sv: new Set(
+      "och i att det som en på är av af för med den till har de inte icke ej om ett han men" +
+      "var jag sig från vi så kan man när hon också efter eller nu under vid över ska skulle" +
+      "bara hur mot upp ut in du alla där mycket ha hade hafva blev vara kunde honom henne" +
+      "hans sin sitt mig dem vad hvad här då än utan genom någon något ingen äro voro ock uti" +
+      "hvar"
       .split(" "),
   ),
   la: new Set(
-    "et in est non ad cum ut qui quae quod sed ex de per si enim autem nec sunt atque ab hoc esse eius iam quam tamen etiam esset erat hunc haec illa res rem omnes omnia nam quoque ita neque me te se tibi mihi"
+      "et in est non ad ut cum quod qui a me de se sed quae esse atque quam ex erat autem" +
+      "mihi quid si quo eum ac enim e nec te ego per tamen hoc sunt nos ab etiam id vero ipse" +
+      "ille eo ita aut sibi tum esset ubi ea quibus eius nihil haec nobis sic tu quia vel eam" +
+      "tibi jam quidem nisi nunc pro sit inter ne itaque hic iam erant qua illi ejus quum" +
+      "sine his"
+      .split(" "),
+  ),
+  eo: new Set(
+      "la l' kaj de mi al li en ne ke ŝi estas vi estis por sed kun kiu sur ili per tiu el" +
+      "kiel pri pli mia da ni ĝi ĉi tio ĉu kiam tiel min lin sia tre unu sin oni lia ĝin se" +
+      "nur jam ĉar sian post ĉe kiuj antaŭ nun pro ŝia aŭ dum tie plej ŝin vin ĉiuj kiun ol" +
+      "via kion do tion tiun ankoraŭ ilin tiuj ankaŭ tamen je eĉ ĝis si esti"
+      .split(" "),
+  ),
+  ca: new Set(
+      "de i la que a el un en no una les per els amb del se al més com hi es però era li va" +
+      "és si ho dels jo em seu seva ell ja ha o us me ella fins això aquell on pas sense" +
+      "sobre què ni son lo aquest aquesta aquella entre perquè cap als pel qui han són havia" +
+      "havien haver vaig ens sa sota dins quan tu et te meu meva l' d' s' n'"
+      .split(" "),
+  ),
+  da: new Set(
+      "og han i det at var en saa så de til jeg paa på der den med ikke af er hun for sig som" +
+      "et havde om ham men mig da nu du ved har ud blev fra op over vi hans dem deres kunde" +
+      "kunne efter kan vilde ville jo skal sin sit hende hendes skulde skulle hvor alle være" +
+      "været min hvad naar når dig vil noget selv ogsaa også man maa må kun eller dog her" +
+      "ingen"
       .split(" "),
   ),
 };

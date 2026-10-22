@@ -148,11 +148,17 @@ export type Settings = {
 export const LANGUAGES: { code: string; name: string; gutenberg: string }[] = [
   { code: "es", name: "Spanish", gutenberg: "es" },
   { code: "fr", name: "French", gutenberg: "fr" },
+  { code: "fi", name: "Finnish", gutenberg: "fi" },
   { code: "de", name: "German", gutenberg: "de" },
+  { code: "nl", name: "Dutch", gutenberg: "nl" },
   { code: "it", name: "Italian", gutenberg: "it" },
   { code: "pt", name: "Portuguese", gutenberg: "pt" },
-  { code: "nl", name: "Dutch", gutenberg: "nl" },
+  { code: "hu", name: "Hungarian", gutenberg: "hu" },
+  { code: "sv", name: "Swedish", gutenberg: "sv" },
   { code: "la", name: "Latin", gutenberg: "la" },
+  { code: "eo", name: "Esperanto", gutenberg: "eo" },
+  { code: "ca", name: "Catalan", gutenberg: "ca" },
+  { code: "da", name: "Danish", gutenberg: "da" },
 ];
 
 export function langName(code: string): string {
